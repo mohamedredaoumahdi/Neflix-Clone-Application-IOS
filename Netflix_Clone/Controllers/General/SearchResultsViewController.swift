@@ -8,7 +8,7 @@
 import UIKit
 
 protocol SearchResultsViewControllerDelegate: AnyObject {
-    func searchResultsViewControllerDidTapItem(_ viewModel: TitlePreviewViewModel)
+    func searchResultsViewControllerDidTapItem(_ viewController: TitlePreviewViewController)
 }
 
 class SearchResultsViewController: UIViewController {
@@ -62,19 +62,31 @@ extension SearchResultsViewController : UICollectionViewDelegate, UICollectionVi
         collectionView.deselectItem(at: indexPath, animated: true)
         
         let title = titles[indexPath.row]
-        let titleName = title.originalTitle ?? ""
-        APICaller.shared.getMovie(with: titleName) { [weak self] result in
+        
+        // Show loading indicator
+        LoadingView.shared.showLoading(in: view, withText: "Loading details...")
+        
+        // Load detailed information
+        ContentService.shared.loadDetailedTitle(for: title) { [weak self] result in
+            // Hide loading indicator
+            DispatchQueue.main.async {
+                LoadingView.shared.hideLoading()
+            }
+            
             switch result {
-            case .success(let videoElement):
-                self?.delegate?.searchResultsViewControllerDidTapItem(TitlePreviewViewModel(title: title.originalTitle ?? "", youtubeView: videoElement, titleOverview: title.overview ?? ""))
-
-                
+            case .success(let viewController):
+                DispatchQueue.main.async {
+                    self?.delegate?.searchResultsViewControllerDidTapItem(viewController)
+                }
             case .failure(let error):
-                print(error.localizedDescription)
+                DispatchQueue.main.async {
+                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                       let rootViewController = windowScene.windows.first?.rootViewController {
+                        ErrorPresenter.showError(error, on: rootViewController)
+                    }
+                }
             }
         }
-        
-
     }
     
     

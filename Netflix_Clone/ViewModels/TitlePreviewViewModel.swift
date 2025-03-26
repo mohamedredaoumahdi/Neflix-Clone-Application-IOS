@@ -18,10 +18,15 @@ struct TitlePreviewViewModel {
     let genres: [String]?
     let runtime: String?
     
+    // Detailed information
+    let movieDetail: MovieDetail?
+    let tvShowDetail: TVShowDetail?
+    
     // Initializer with full details
     init(title: String, youtubeView: VideoElement?, titleOverview: String,
          releaseDate: String? = nil, voteAverage: Double? = nil,
-         genres: [String]? = nil, runtime: String? = nil) {
+         genres: [String]? = nil, runtime: String? = nil,
+         movieDetail: MovieDetail? = nil, tvShowDetail: TVShowDetail? = nil) {
         self.title = title
         self.youtubeView = youtubeView
         self.titleOverview = titleOverview
@@ -29,6 +34,8 @@ struct TitlePreviewViewModel {
         self.voteAverage = voteAverage
         self.genres = genres
         self.runtime = runtime
+        self.movieDetail = movieDetail
+        self.tvShowDetail = tvShowDetail
     }
     
     // Convenience initializer from a MovieDetail
@@ -40,6 +47,8 @@ struct TitlePreviewViewModel {
         self.voteAverage = movieDetail.voteAverage
         self.genres = movieDetail.genres?.map { $0.name }
         self.runtime = movieDetail.formattedRuntime
+        self.movieDetail = movieDetail
+        self.tvShowDetail = nil
     }
     
     // Convenience initializer from a TVShowDetail
@@ -51,5 +60,20 @@ struct TitlePreviewViewModel {
         self.voteAverage = tvShowDetail.voteAverage
         self.genres = tvShowDetail.genres?.map { $0.name }
         self.runtime = "\(tvShowDetail.numberOfSeasons ?? 0) Seasons"
+        self.movieDetail = nil
+        self.tvShowDetail = tvShowDetail
+    }
+    
+    // Simplified initializer for backward compatibility
+    init(title: String, youtubeView: VideoElement, titleOverview: String) {
+        self.title = title
+        self.youtubeView = youtubeView
+        self.titleOverview = titleOverview
+        self.releaseDate = nil
+        self.voteAverage = nil
+        self.genres = nil
+        self.runtime = nil
+        self.movieDetail = nil
+        self.tvShowDetail = nil
     }
 }

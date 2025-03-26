@@ -13,13 +13,20 @@ class TitlePreviewViewController: UIViewController {
     // MARK: - Properties
     
     private var viewModel: TitlePreviewViewModel?
-    private var titleItem: Title?
+    private var castMembers: [Cast] = []
+    private var recommendations: [Title] = []
+    
+    // Public method to get the view model
+    func getViewModel() -> TitlePreviewViewModel? {
+        return viewModel
+    }
     
     // MARK: - UI Components
     
     private let scrollView: UIScrollView = {
         let scrollView = UIScrollView()
         scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.showsVerticalScrollIndicator = false
         return scrollView
     }()
     
@@ -37,27 +44,27 @@ class TitlePreviewViewController: UIViewController {
     
     private let titleLabel: UILabel = {
         let label = UILabel()
-        label.translatesAutoresizingMaskIntoConstraints = false
         label.font = .systemFont(ofSize: 22, weight: .bold)
         label.textColor = .label
         label.numberOfLines = 0
+        label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
     
     private let overviewLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 16, weight: .regular)
-        label.translatesAutoresizingMaskIntoConstraints = false
-        label.numberOfLines = 0
+        label.font = .systemFont(ofSize: 15, weight: .regular)
         label.textColor = .label
+        label.numberOfLines = 0
+        label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
     
     private let infoLabel: UILabel = {
         let label = UILabel()
         label.font = .systemFont(ofSize: 14, weight: .medium)
-        label.translatesAutoresizingMaskIntoConstraints = false
         label.textColor = .secondaryLabel
+        label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
     
@@ -71,15 +78,78 @@ class TitlePreviewViewController: UIViewController {
         return stackView
     }()
     
+    private let castLabel: UILabel = {
+        let label = UILabel()
+        label.text = "Cast"
+        label.font = .systemFont(ofSize: 18, weight: .bold)
+        label.textColor = .label
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private let castCollectionView: UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .horizontal
+        layout.itemSize = CGSize(width: 100, height: 140)
+        layout.minimumInteritemSpacing = 10
+        
+        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        collectionView.backgroundColor = .systemBackground
+        collectionView.showsHorizontalScrollIndicator = false
+        collectionView.translatesAutoresizingMaskIntoConstraints = false
+        return collectionView
+    }()
+    
+    private let recommendationsLabel: UILabel = {
+        let label = UILabel()
+        label.text = "More Like This"
+        label.font = .systemFont(ofSize: 18, weight: .bold)
+        label.textColor = .label
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private let recommendationsCollectionView: UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .horizontal
+        layout.itemSize = CGSize(width: 120, height: 180)
+        layout.minimumInteritemSpacing = 10
+        
+        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        collectionView.backgroundColor = .systemBackground
+        collectionView.showsHorizontalScrollIndicator = false
+        collectionView.translatesAutoresizingMaskIntoConstraints = false
+        return collectionView
+    }()
+    
     // MARK: - Lifecycle Methods
     
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
         setupUI()
+        setupCollectionViews()
     }
     
-    // MARK: - UI Setup
+    // MARK: - Setup Methods
+    
+    private func setupCollectionViews() {
+        // Register cell classes
+        castCollectionView.register(CastCollectionViewCell.self, forCellWithReuseIdentifier: CastCollectionViewCell.identifier)
+        recommendationsCollectionView.register(TitleCollectionViewCell.self, forCellWithReuseIdentifier: TitleCollectionViewCell.identifier)
+        
+        // Set delegate and data source
+        castCollectionView.delegate = self
+        castCollectionView.dataSource = self
+        recommendationsCollectionView.delegate = self
+        recommendationsCollectionView.dataSource = self
+        
+        // Initially hide sections until we have data
+        castLabel.isHidden = true
+        castCollectionView.isHidden = true
+        recommendationsLabel.isHidden = true
+        recommendationsCollectionView.isHidden = true
+    }
     
     private func setupUI() {
         // Add scrollView and contentView
@@ -92,6 +162,10 @@ class TitlePreviewViewController: UIViewController {
         contentView.addSubview(infoLabel)
         contentView.addSubview(genreStackView)
         contentView.addSubview(overviewLabel)
+        contentView.addSubview(castLabel)
+        contentView.addSubview(castCollectionView)
+        contentView.addSubview(recommendationsLabel)
+        contentView.addSubview(recommendationsCollectionView)
         
         // Configure constraints
         configureConstraints()
@@ -145,8 +219,30 @@ class TitlePreviewViewController: UIViewController {
         NSLayoutConstraint.activate([
             overviewLabel.topAnchor.constraint(equalTo: genreStackView.bottomAnchor, constant: 16),
             overviewLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            overviewLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            overviewLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20)
+            overviewLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20)
+        ])
+        
+        // Cast section constraints
+        NSLayoutConstraint.activate([
+            castLabel.topAnchor.constraint(equalTo: overviewLabel.bottomAnchor, constant: 24),
+            castLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            
+            castCollectionView.topAnchor.constraint(equalTo: castLabel.bottomAnchor, constant: 12),
+            castCollectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            castCollectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            castCollectionView.heightAnchor.constraint(equalToConstant: 140)
+        ])
+        
+        // Recommendations section constraints
+        NSLayoutConstraint.activate([
+            recommendationsLabel.topAnchor.constraint(equalTo: castCollectionView.bottomAnchor, constant: 24),
+            recommendationsLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            
+            recommendationsCollectionView.topAnchor.constraint(equalTo: recommendationsLabel.bottomAnchor, constant: 12),
+            recommendationsCollectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            recommendationsCollectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            recommendationsCollectionView.heightAnchor.constraint(equalToConstant: 180),
+            recommendationsCollectionView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -30)
         ])
     }
     
@@ -213,6 +309,39 @@ class TitlePreviewViewController: UIViewController {
             genreStackView.isHidden = true
         }
         
+        // Set cast if available
+        if let movieDetail = model.movieDetail {
+            if let cast = movieDetail.credits?.cast, !cast.isEmpty {
+                self.castMembers = cast.prefix(10).sorted(by: { $0.order < $1.order })
+                castLabel.isHidden = false
+                castCollectionView.isHidden = false
+                castCollectionView.reloadData()
+            }
+            
+            // Set recommendations if available
+            if let similar = movieDetail.similar?.results, !similar.isEmpty {
+                self.recommendations = similar.prefix(10).map { $0 }
+                recommendationsLabel.isHidden = false
+                recommendationsCollectionView.isHidden = false
+                recommendationsCollectionView.reloadData()
+            }
+        } else if let tvDetail = model.tvShowDetail {
+            if let cast = tvDetail.credits?.cast, !cast.isEmpty {
+                self.castMembers = cast.prefix(10).sorted(by: { $0.order < $1.order })
+                castLabel.isHidden = false
+                castCollectionView.isHidden = false
+                castCollectionView.reloadData()
+            }
+            
+            // Set recommendations if available
+            if let similar = tvDetail.similar?.results, !similar.isEmpty {
+                self.recommendations = similar.prefix(10).map { $0 }
+                recommendationsLabel.isHidden = false
+                recommendationsCollectionView.isHidden = false
+                recommendationsCollectionView.reloadData()
+            }
+        }
+        
         // Load YouTube video if available
         if let videoElement = model.youtubeView {
             let videoId = videoElement.id.videoId
@@ -270,44 +399,107 @@ class TitlePreviewViewController: UIViewController {
     }
 }
 
+// MARK: - UICollectionViewDelegate, UICollectionViewDataSource
+
+extension TitlePreviewViewController: UICollectionViewDelegate, UICollectionViewDataSource {
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        if collectionView == castCollectionView {
+            return castMembers.count
+        } else if collectionView == recommendationsCollectionView {
+            return recommendations.count
+        }
+        return 0
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        if collectionView == castCollectionView {
+            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: CastCollectionViewCell.identifier, for: indexPath) as? CastCollectionViewCell else {
+                return UICollectionViewCell()
+            }
+            
+            let castMember = castMembers[indexPath.item]
+            cell.configure(with: castMember)
+            return cell
+            
+        } else if collectionView == recommendationsCollectionView {
+            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: TitleCollectionViewCell.identifier, for: indexPath) as? TitleCollectionViewCell else {
+                return UICollectionViewCell()
+            }
+            
+            let title = recommendations[indexPath.item]
+            if let posterPath = title.posterPath {
+                cell.configure(with: posterPath)
+            }
+            return cell
+        }
+        
+        return UICollectionViewCell()
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        collectionView.deselectItem(at: indexPath, animated: true)
+        
+        if collectionView == recommendationsCollectionView {
+            let title = recommendations[indexPath.item]
+            
+            // Show loading indicator
+            LoadingView.shared.showLoading(in: view, withText: "Loading...")
+            
+            // Get detailed title information
+            ContentService.shared.loadDetailedTitle(for: title) { [weak self] result in
+                // Hide loading
+                DispatchQueue.main.async {
+                    LoadingView.shared.hideLoading()
+                }
+                
+                switch result {
+                case .success(let viewController):
+                    DispatchQueue.main.async {
+                        self?.navigationController?.pushViewController(viewController, animated: true)
+                    }
+                case .failure(let error):
+                    DispatchQueue.main.async {
+                        ErrorPresenter.showError(error, on: self!)
+                    }
+                }
+            }
+        }
+    }
+}
+
 // MARK: - WKNavigationDelegate
 
 extension TitlePreviewViewController: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        // Hide the spinner when the web page finishes loading
+        // Hide loading indicator when web view finishes loading
         if let spinner = webView.subviews.first(where: { $0 is UIActivityIndicatorView }) as? UIActivityIndicatorView {
-            spinner.stopAnimating()
-            spinner.removeFromSuperview()
+            UIView.animate(withDuration: 0.3, animations: {
+                spinner.alpha = 0
+            }, completion: { _ in
+                spinner.removeFromSuperview()
+            })
         }
     }
     
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        // Hide the spinner on error
+        // Handle navigation failure
         if let spinner = webView.subviews.first(where: { $0 is UIActivityIndicatorView }) as? UIActivityIndicatorView {
-            spinner.stopAnimating()
             spinner.removeFromSuperview()
         }
         
-        // Show error message
-        let errorView = UIView()
-        errorView.backgroundColor = .systemBackground
-        errorView.translatesAutoresizingMaskIntoConstraints = false
-        
+        // Show error message in web view
         let errorLabel = UILabel()
         errorLabel.text = "Failed to load video"
         errorLabel.textAlignment = .center
-        errorLabel.textColor = .secondaryLabel
+        errorLabel.textColor = .white
         errorLabel.translatesAutoresizingMaskIntoConstraints = false
         
+        let errorView = UIView(frame: webView.bounds)
+        errorView.backgroundColor = .black
         errorView.addSubview(errorLabel)
         webView.addSubview(errorView)
         
         NSLayoutConstraint.activate([
-            errorView.topAnchor.constraint(equalTo: webView.topAnchor),
-            errorView.leadingAnchor.constraint(equalTo: webView.leadingAnchor),
-            errorView.trailingAnchor.constraint(equalTo: webView.trailingAnchor),
-            errorView.bottomAnchor.constraint(equalTo: webView.bottomAnchor),
-            
             errorLabel.centerXAnchor.constraint(equalTo: errorView.centerXAnchor),
             errorLabel.centerYAnchor.constraint(equalTo: errorView.centerYAnchor)
         ])

@@ -8,7 +8,11 @@
 import UIKit
 
 protocol ColletionViewTableViewCellDelegate: AnyObject {
+    // Legacy method (for backward compatibility)
     func colletionViewTableViewCellDidTapCell(_ cell: CollectionTableViewCell, viewModel: TitlePreviewViewModel)
+    
+    // New method that passes the title for detailed loading
+    func colletionViewTableViewCellDidTapCell(_ cell: CollectionTableViewCell, title: Title)
 }
 
 class CollectionTableViewCell: UITableViewCell {
@@ -154,6 +158,14 @@ class CollectionTableViewCell: UITableViewCell {
         }
     }
     
+    // Returns the currently selected title if there is one, or the first title as a fallback
+    func getCurrentTitle() -> Title? {
+        if let indexPaths = collectionView.indexPathsForSelectedItems, let indexPath = indexPaths.first {
+            return titles[indexPath.row]
+        }
+        return titles.first
+    }
+    
     func showSkeletonLoading() {
         DispatchQueue.main.async { [weak self] in
             self?.collectionView.isHidden = true
@@ -260,47 +272,8 @@ extension CollectionTableViewCell: UICollectionViewDelegate, UICollectionViewDat
         
         let title = titles[indexPath.row]
         
-        // Get title name
-        guard let titleName = title.originalTitle ?? title.originalName else {
-            return
-        }
-        
-        // Show loading indicator before fetching trailer
-        LoadingView.shared.showLoading(in: self.window ?? UIView(), withText: "Loading trailer...")
-        
-        // Get trailer from YouTube API
-        APICaller.shared.getMovie(with: titleName + " trailer") { [weak self] result in
-            // Hide loading indicator
-            LoadingView.shared.hideLoading()
-            
-            switch result {
-            case .success(let videoElement):
-                // Create view model for selected title
-                guard let overview = title.overview else { return }
-                
-                let viewModel = TitlePreviewViewModel(
-                    title: titleName,
-                    youtubeView: videoElement,
-                    titleOverview: overview,
-                    releaseDate: title.releaseDate,
-                    voteAverage: title.voteAverage
-                )
-                
-                // Notify delegate of cell tap
-                guard let strongSelf = self else { return }
-                self?.delegate?.colletionViewTableViewCellDidTapCell(strongSelf, viewModel: viewModel)
-                
-            case .failure(let error):
-                // Handle error
-                print("Failed to get YouTube video: \(error.localizedDescription)")
-                
-                // Show error alert
-                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                   let rootViewController = windowScene.windows.first?.rootViewController {
-                    ErrorPresenter.showError(error, on: rootViewController)
-                }
-            }
-        }
+        // Use the new delegate method that passes the title directly
+        delegate?.colletionViewTableViewCellDidTapCell(self, title: title)
     }
     
     func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
@@ -329,7 +302,7 @@ extension CollectionTableViewCell: UICollectionViewDelegate, UICollectionViewDat
                 
                 return previewVC
             },
-            actionProvider: { _ in
+            actionProvider: { [weak self] _ in
                 let saveAction = UIAction(
                     title: "Add to My List",
                     image: UIImage(systemName: "plus"),
@@ -337,7 +310,7 @@ extension CollectionTableViewCell: UICollectionViewDelegate, UICollectionViewDat
                 ) { _ in
                     // Implementation for adding to watchlist
                     // This would be implemented in Phase 5
-                    print("Added to watchlist: \(self.titles[indexPath.row].originalTitle ?? "Unknown")")
+                    print("Added to watchlist: \(self?.titles[indexPath.row].originalTitle ?? "Unknown")")
                 }
                 
                 let shareAction = UIAction(
@@ -346,16 +319,17 @@ extension CollectionTableViewCell: UICollectionViewDelegate, UICollectionViewDat
                     identifier: nil
                 ) { _ in
                     // Share functionality
-                    let title = self.titles[indexPath.row]
-                    let titleName = title.originalTitle ?? title.originalName ?? "Movie"
-                    let activityVC = UIActivityViewController(
-                        activityItems: ["Check out '\(titleName)' on Netflix Clone!"],
-                        applicationActivities: nil
-                    )
-                    
-                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                       let rootViewController = windowScene.windows.first?.rootViewController {
-                        rootViewController.present(activityVC, animated: true)
+                    if let title = self?.titles[indexPath.row] {
+                        let titleName = title.originalTitle ?? title.originalName ?? "Movie"
+                        let activityVC = UIActivityViewController(
+                            activityItems: ["Check out '\(titleName)' on Netflix Clone!"],
+                            applicationActivities: nil
+                        )
+                        
+                        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                           let rootViewController = windowScene.windows.first?.rootViewController {
+                            rootViewController.present(activityVC, animated: true)
+                        }
                     }
                 }
                 

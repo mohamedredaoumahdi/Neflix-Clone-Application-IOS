@@ -34,44 +34,48 @@ class APICaller {
         return request
     }
     
-    // In APICaller.swift, update the executeRequest method:
+    // Helper method for executing requests with proper error handling
     private func executeRequest<T: Decodable>(request: URLRequest, completion: @escaping (Result<T, Error>) -> Void) {
         let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            // Handle network errors
             if let error = error {
                 completion(.failure(error))
                 return
             }
             
+            // Check for valid response
             guard let httpResponse = response as? HTTPURLResponse,
                   (200...299).contains(httpResponse.statusCode) else {
                 completion(.failure(APIError.failedToGetData))
                 return
             }
             
+            // Check for data
             guard let data = data else {
                 completion(.failure(APIError.noDataReturned))
                 return
             }
             
-            // Print raw JSON for debugging
-
+            // Debug JSON for complex responses
+            #if DEBUG
             if let jsonString = String(data: data, encoding: .utf8) {
-
-                print("Raw JSON first 500 chars: \(jsonString.prefix(500))")
-
+                print("Response first 500 chars: \(String(jsonString.prefix(500)))")
             }
+            #endif
             
+            // Decode the response
             do {
                 let decoder = JSONDecoder()
                 decoder.keyDecodingStrategy = .convertFromSnakeCase
                 let result = try decoder.decode(T.self, from: data)
                 completion(.success(result))
-                
             } catch {
                 print("Decoding error: \(error)")
+                print("Type being decoded: \(T.self)")
                 completion(.failure(APIError.decodingError))
             }
         }
+        
         task.resume()
     }
     
@@ -231,7 +235,8 @@ class APICaller {
     // MARK: - Extended TMDB API Calls
     
     func getMovieDetails(for movieId: Int, completion: @escaping (Result<MovieDetail, Error>) -> Void) {
-        guard let url = URL(string: "\(Configuration.URLs.TMDB_BASE_URL)/movie/\(movieId)?language=en-US&append_to_response=credits,similar,videos") else {
+        // Append credits, similar, and videos to get all details in one request
+        guard let url = URL(string: "\(Configuration.URLs.TMDB_BASE_URL)/movie/\(movieId)?append_to_response=credits,similar,videos&language=en-US") else {
             completion(.failure(APIError.invalidURL))
             return
         }
@@ -241,7 +246,8 @@ class APICaller {
     }
     
     func getTVShowDetails(for tvId: Int, completion: @escaping (Result<TVShowDetail, Error>) -> Void) {
-        guard let url = URL(string: "\(Configuration.URLs.TMDB_BASE_URL)/tv/\(tvId)?language=en-US&append_to_response=credits,similar,videos") else {
+        // Append credits, similar, and videos to get all details in one request
+        guard let url = URL(string: "\(Configuration.URLs.TMDB_BASE_URL)/tv/\(tvId)?append_to_response=credits,similar,videos&language=en-US") else {
             completion(.failure(APIError.invalidURL))
             return
         }
@@ -249,4 +255,6 @@ class APICaller {
         let request = createRequest(with: url)
         executeRequest(request: request, completion: completion)
     }
+    
+    
 }

@@ -4,7 +4,7 @@
 // Created by mohamed reda oumahdi on 27/03/2025.
 //
 
-import Foundation
+import UIKit
 
 class ContentService {
     
@@ -17,6 +17,97 @@ class ContentService {
     // MARK: - Properties
     
     private let apiCaller = APICaller.shared
+    
+    // MARK: - Loading Detailed Title Information
+    
+    /// Loads detailed title information and creates a view controller
+    func loadDetailedTitle(for title: Title, completion: @escaping (Result<TitlePreviewViewController, AppError>) -> Void) {
+        // Determine if this is a movie or TV show
+        let isTV = title.mediaType == "tv" || (title.originalName != nil && title.originalTitle == nil)
+        let titleId = title.id
+        
+        // Create loading sequence
+        let dispatchGroup = DispatchGroup()
+        
+        // Variables to store results
+        var movieDetail: MovieDetail?
+        var tvShowDetail: TVShowDetail?
+        var youtubeElement: VideoElement?
+        var loadError: Error?
+        
+        // 1. Fetch YouTube trailer
+        dispatchGroup.enter()
+        let titleName = title.originalTitle ?? title.originalName ?? "Unknown"
+        apiCaller.getMovie(with: "\(titleName) trailer") { result in
+            switch result {
+            case .success(let videoElement):
+                youtubeElement = videoElement
+            case .failure(let error):
+                print("Failed to fetch trailer: \(error.localizedDescription)")
+                // Don't set loadError, as trailer is optional
+            }
+            dispatchGroup.leave()
+        }
+        
+        // 2. Fetch detailed information
+        dispatchGroup.enter()
+        if isTV {
+            apiCaller.getTVShowDetails(for: titleId) { result in
+                switch result {
+                case .success(let details):
+                    tvShowDetail = details
+                case .failure(let error):
+                    loadError = error
+                    print("Failed to fetch TV details: \(error.localizedDescription)")
+                }
+                dispatchGroup.leave()
+            }
+        } else {
+            apiCaller.getMovieDetails(for: titleId) { result in
+                switch result {
+                case .success(let details):
+                    movieDetail = details
+                case .failure(let error):
+                    loadError = error
+                    print("Failed to fetch movie details: \(error.localizedDescription)")
+                }
+                dispatchGroup.leave()
+            }
+        }
+        
+        // Process results when all operations complete
+        dispatchGroup.notify(queue: .main) {
+            // Check for errors
+            if let error = loadError {
+                completion(.failure(self.mapError(error)))
+                return
+            }
+            
+            // Create appropriate view model
+            let viewModel: TitlePreviewViewModel
+            
+            if let movieDetail = movieDetail {
+                viewModel = TitlePreviewViewModel(movieDetail: movieDetail, youtubeView: youtubeElement)
+            } else if let tvShowDetail = tvShowDetail {
+                viewModel = TitlePreviewViewModel(tvShowDetail: tvShowDetail, youtubeView: youtubeElement)
+            } else {
+                // Fallback to basic view model if no detailed info available
+                viewModel = TitlePreviewViewModel(
+                    title: titleName,
+                    youtubeView: youtubeElement,
+                    titleOverview: title.overview ?? "No overview available",
+                    releaseDate: title.releaseDate,
+                    voteAverage: title.voteAverage
+                )
+            }
+            
+            // Create and configure view controller
+            let viewController = TitlePreviewViewController()
+            viewController.configure(with: viewModel)
+            
+            completion(.success(viewController))
+        }
+    }
     
     // MARK: - Content Loading Methods
     
@@ -88,54 +179,6 @@ class ContentService {
                 completion(.success(titles))
             case .failure(let error):
                 completion(.failure(self.mapError(error)))
-            }
-        }
-    }
-    
-    /// Gets detailed information for a movie
-    func getMovieDetails(for movieId: Int, completion: @escaping (Result<TitlePreviewViewModel, AppError>) -> Void) {
-        // First get the movie details
-        apiCaller.getMovieDetails(for: movieId) { [weak self] result in
-            switch result {
-            case .success(let movieDetail):
-                // Get YouTube trailer if videos are available
-                let youtubeQuery = "\(movieDetail.title) trailer"
-                
-                self?.apiCaller.getMovie(with: youtubeQuery) { youtubeResult in
-                    // Create view model with movie details
-                    switch youtubeResult {
-                    case .success(let videoElement):
-                        // Create view model with all details and trailer
-                        let genreNames = movieDetail.genres?.map { $0.name } ?? []
-                        let viewModel = TitlePreviewViewModel(
-                            title: movieDetail.title,
-                            youtubeView: videoElement,
-                            titleOverview: movieDetail.overview ?? "No overview available",
-                            releaseDate: movieDetail.releaseDate,
-                            voteAverage: movieDetail.voteAverage,
-                            genres: genreNames,
-                            runtime: movieDetail.formattedRuntime
-                        )
-                        completion(.success(viewModel))
-                        
-                    case .failure(_):
-                        // Create view model without trailer
-                        let genreNames = movieDetail.genres?.map { $0.name } ?? []
-                        let viewModel = TitlePreviewViewModel(
-                            title: movieDetail.title,
-                            youtubeView: nil,
-                            titleOverview: movieDetail.overview ?? "No overview available",
-                            releaseDate: movieDetail.releaseDate,
-                            voteAverage: movieDetail.voteAverage,
-                            genres: genreNames,
-                            runtime: movieDetail.formattedRuntime
-                        )
-                        completion(.success(viewModel))
-                    }
-                }
-                
-            case .failure(let error):
-                completion(.failure(self?.mapError(error) ?? .unknownError))
             }
         }
     }

@@ -262,12 +262,38 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
 
 // MARK: - ColletionViewTableViewCellDelegate
 
+// Update the ColletionViewTableViewCellDelegate extension in HomeViewController
+
 extension HomeViewController: ColletionViewTableViewCellDelegate {
     func colletionViewTableViewCellDidTapCell(_ cell: CollectionTableViewCell, viewModel: TitlePreviewViewModel) {
         DispatchQueue.main.async { [weak self] in
             let vc = TitlePreviewViewController()
             vc.configure(with: viewModel)
             self?.navigationController?.pushViewController(vc, animated: true)
+        }
+    }
+    
+    func colletionViewTableViewCellDidTapCell(_ cell: CollectionTableViewCell, title: Title) {
+        // Show loading indicator
+        LoadingView.shared.showLoading(in: view, withText: "Loading details...")
+        
+        // Load detailed title info using ContentService
+        ContentService.shared.loadDetailedTitle(for: title) { [weak self] result in
+            // Hide loading indicator
+            DispatchQueue.main.async {
+                LoadingView.shared.hideLoading()
+            }
+            
+            switch result {
+            case .success(let viewController):
+                DispatchQueue.main.async {
+                    self?.navigationController?.pushViewController(viewController, animated: true)
+                }
+            case .failure(let error):
+                DispatchQueue.main.async {
+                    ErrorPresenter.showError(error, on: self!)
+                }
+            }
         }
     }
 }
