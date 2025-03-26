@@ -42,7 +42,7 @@ class SearchViewController: UIViewController {
     
     func fetchSearchedMovie(){
         
-        APICller.shared.searchForMovieByName(completing: { [weak self] result in
+        APICaller.shared.searchForMovieByName(completing: { [weak self] result in
                         switch result {
             case .success(let titles) :
                 self?.titles = titles
@@ -71,7 +71,7 @@ extension SearchViewController : UITableViewDelegate, UITableViewDataSource {
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         guard let cell = tableView.dequeueReusableCell(withIdentifier: TitleTableViewCell.identifier, for: indexPath) as? TitleTableViewCell else {return UITableViewCell()}
         let title = titles[indexPath.row]
-        cell.configure(with: TitleViewModel(titleName: (title.original_title ?? title.original_name ?? "Unknown"), posterURL: title.poster_path ?? ""))
+        cell.configure(with: TitleViewModel(titleName: (title.originalTitle ?? title.originalName ?? "Unknown"), posterURL: title.posterPath ?? ""))
         return cell
     }
     
@@ -83,12 +83,12 @@ extension SearchViewController : UITableViewDelegate, UITableViewDataSource {
         
         let title = titles[indexPath.row]
         
-        guard let titleName = title.original_title ?? title.original_name else {
+        guard let titleName = title.originalTitle ?? title.originalName else {
             return
         }
         
         
-        APICller.shared.getMovie(with: titleName) { [weak self] result in
+        APICaller.shared.getMovie(with: titleName) { [weak self] result in
             switch result {
             case .success(let videoElement):
                 DispatchQueue.main.async {
@@ -117,7 +117,7 @@ extension SearchViewController : UISearchResultsUpdating , SearchResultsViewCont
                 return
         }
         resultsController.delegate = self
-        APICller.shared.searchForMovieByName(with: query) { results in
+        APICaller.shared.searchForMovieByName(with: query) { results in
             DispatchQueue.main.async {
                 switch results{
                 case .success(let titles):

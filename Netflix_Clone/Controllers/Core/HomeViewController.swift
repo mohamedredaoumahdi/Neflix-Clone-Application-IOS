@@ -1,68 +1,75 @@
+// HomeViewController.swift
+// Netflix_Clone
 //
-//  HomeViewController.swift
-//  Netflix_Clone
-//
-//  Created by mohamed reda oumahdi on 27/02/2024.
+// Created by mohamed reda oumahdi on 27/02/2024.
+// Updated on 27/03/2025.
 //
 
 import UIKit
 
-enum Sections : Int {
+enum Sections: Int {
     case TrendingMovies = 0
-    case TrendingTVSows = 1
-    case popular = 2
+    case TrendingTVShows = 1
+    case Popular = 2
     case UpcomingMovies = 3
-    case TopReted = 4
+    case TopRated = 4
 }
+
 class HomeViewController: UIViewController {
     
-    private var randomTrendingMovie : Title?
-    private var headerView : HeroHeaderUIView?
+    // MARK: - Properties
     
-    let sectionTitles : [String] = ["Trending Movies", "Trending TV Shows", "Popular", "Upcoming Movies", "Top rated"]
+    private var randomTrendingMovie: Title?
+    private var headerView: HeroHeaderUIView?
     
-    private let homeFeedTable : UITableView = {
+    private let sectionTitles: [String] = [
+        "Trending Movies",
+        "Trending TV Shows",
+        "Popular",
+        "Upcoming Movies",
+        "Top Rated"
+    ]
+    
+    // MARK: - UI Components
+    
+    private let homeFeedTable: UITableView = {
         let table = UITableView(frame: .zero, style: .grouped)
         table.register(CollectionTableViewCell.self, forCellReuseIdentifier: CollectionTableViewCell.identifier)
+        table.showsVerticalScrollIndicator = false
+        table.separatorStyle = .none
+        table.backgroundColor = .systemBackground
         return table
     }()
     
+    private let refreshControl: UIRefreshControl = {
+        let refreshControl = UIRefreshControl()
+        refreshControl.tintColor = .label
+        return refreshControl
+    }()
+    
+    // MARK: - Lifecycle Methods
+    
     override func viewDidLoad() {
         super.viewDidLoad()
+        
         view.backgroundColor = .systemBackground
         view.addSubview(homeFeedTable)
+        
         homeFeedTable.delegate = self
         homeFeedTable.dataSource = self
-        configureNavBar()
-        headerView = HeroHeaderUIView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: 450))
-        homeFeedTable.tableHeaderView = headerView
-        configureHeroHeaderView()
+        homeFeedTable.refreshControl = refreshControl
+        refreshControl.addTarget(self, action: #selector(refreshData), for: .valueChanged)
         
-    }
-    
-    private func configureHeroHeaderView() {
-        APICller.shared.getTrendingMovies { [weak self] result in
-            switch result {
-            case .success(let titles):
-                let selectedTitle = titles.randomElement()
-                self?.randomTrendingMovie = selectedTitle
-                self?.headerView?.configure(with: TitleViewModel(titleName: selectedTitle?.original_title ?? "", posterURL: selectedTitle?.poster_path ?? ""))
-            case .failure(let error):
-                print(error.localizedDescription)
-            }
-        }
-    }
-    
-    private func configureNavBar(){
-        var image = UIImage(named: "netflix_logo")
-        image = image?.withRenderingMode(.alwaysOriginal)
-        navigationItem.leftBarButtonItem = UIBarButtonItem(image: image, style: .done, target: self, action: nil)
-        navigationItem.rightBarButtonItems = [
-            UIBarButtonItem(image: UIImage(systemName: "person"), style: .done, target: self, action: nil),
-            UIBarButtonItem(image: UIImage(systemName: "play.rectangle"), style: .done, target: self, action: nil),
-            
-        ]
-        navigationController?.navigationBar.tintColor = .label
+        configureNavBar()
+        
+        headerView = HeroHeaderUIView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: 500))
+        homeFeedTable.tableHeaderView = headerView
+        
+        // Show loading indicator
+        LoadingView.shared.showLoading(in: view, withText: "Loading content...")
+        
+        // Fetch initial data
+        configureHeroHeaderView()
     }
     
     override func viewDidLayoutSubviews() {
@@ -70,11 +77,81 @@ class HomeViewController: UIViewController {
         homeFeedTable.frame = view.bounds
     }
     
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        print("View appeared - forcing table reload")
+        homeFeedTable.reloadData()
+    }
     
+    // MARK: - Setup Methods
     
+    private func configureNavBar() {
+        var image = UIImage(named: "netflix_logo")
+        image = image?.withRenderingMode(.alwaysOriginal)
+        
+        navigationItem.leftBarButtonItem = UIBarButtonItem(image: image, style: .done, target: self, action: nil)
+        
+        navigationItem.rightBarButtonItems = [
+            UIBarButtonItem(image: UIImage(systemName: "person"), style: .done, target: self, action: nil),
+            UIBarButtonItem(image: UIImage(systemName: "play.rectangle"), style: .done, target: self, action: nil),
+        ]
+        
+        navigationController?.navigationBar.tintColor = .label
+        navigationController?.navigationBar.setBackgroundImage(UIImage(), for: .default)
+        navigationController?.navigationBar.shadowImage = UIImage()
+    }
+    
+    // MARK: - Data Loading Methods
+    
+    @objc private func refreshData() {
+        // Refresh all sections
+        configureHeroHeaderView()
+        
+        // Reload table with animation
+        UIView.transition(with: homeFeedTable, duration: 0.35, options: .transitionCrossDissolve, animations: {
+            self.homeFeedTable.reloadData()
+        }, completion: nil)
+    }
+    
+    private func configureHeroHeaderView() {
+        APICaller.shared.getTrendingMovies { [weak self] result in
+            // Always handle UI updates on the main thread
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let titles):
+                    // Hide loading indicator
+                    LoadingView.shared.hideLoading()
+                    self?.refreshControl.endRefreshing()  // Now on main thread
+                    
+                    // Set random trending movie for header
+                    if let selectedTitle = titles.randomElement() {
+                        self?.randomTrendingMovie = selectedTitle
+                        
+                        // Create detailed view model for header
+                        let viewModel = TitleViewModel(
+                            titleName: selectedTitle.originalTitle ?? selectedTitle.originalName ?? "",
+                            posterURL: selectedTitle.posterPath ?? ""
+                        )
+                        
+                        // Already on main thread
+                        self?.headerView?.configure(with: viewModel)
+                    }
+                    
+                case .failure(let error):
+                    // Hide loading and show error
+                    LoadingView.shared.hideLoading()
+                    self?.refreshControl.endRefreshing()  // Now on main thread
+                    
+                    ErrorPresenter.showError(error, on: self!)
+                }
+            }
+        }
+    }
 }
 
-extension HomeViewController : UITableViewDelegate, UITableViewDataSource{
+// MARK: - UITableViewDelegate, UITableViewDataSource
+
+extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
     
     func numberOfSections(in tableView: UITableView) -> Int {
         return sectionTitles.count
@@ -89,57 +166,60 @@ extension HomeViewController : UITableViewDelegate, UITableViewDataSource{
             return UITableViewCell()
         }
         
+        // Set delegate for handling cell tap events
         cell.delegate = self
+        
+        // Show loading indicator in the cell
+        cell.showSkeletonLoading()
+        
+        // Fetch data based on section
         switch indexPath.section {
         case Sections.TrendingMovies.rawValue:
-            APICller.shared.getTrendingMovies { results in
-                switch results{
-                case .success(let titiles):
-                    cell.configure(with: titiles)
-                case .failure(let error):
-                    print(error.localizedDescription)
-                }
+            APICaller.shared.getTrendingMovies { [weak self] result in
+                self?.handleAPIResponse(result, for: cell)
             }
-        case Sections.TrendingTVSows.rawValue:
-            APICller.shared.getTrendingTVShows { results in
-                switch results{
-                case .success(let titiles):
-                    cell.configure(with: titiles)
-                case .failure(let error):
-                    print(error.localizedDescription)
-                }
+            
+        case Sections.TrendingTVShows.rawValue:
+            APICaller.shared.getTrendingTVShows { [weak self] result in
+                self?.handleAPIResponse(result, for: cell)
             }
-        case Sections.popular.rawValue:
-            APICller.shared.getPopularMovies { results in
-                switch results{
-                case .success(let titiles):
-                    cell.configure(with: titiles)
-                case .failure(let error):
-                    print(error.localizedDescription)
-                }
+            
+        case Sections.Popular.rawValue:
+            APICaller.shared.getPopularMovies { [weak self] result in
+                self?.handleAPIResponse(result, for: cell)
             }
+            
         case Sections.UpcomingMovies.rawValue:
-            APICller.shared.getUPComingMovies { results in
-                switch results{
-                case .success(let titiles):
-                    cell.configure(with: titiles)
-                case .failure(let error):
-                    print(error.localizedDescription)
-                }
+            APICaller.shared.getUPComingMovies { [weak self] result in
+                self?.handleAPIResponse(result, for: cell)
             }
-        case Sections.TopReted.rawValue:
-            APICller.shared.getTopRatedMovies { results in
-                switch results{
-                case .success(let titiles):
-                    cell.configure(with: titiles)
-                case .failure(let error):
-                    print(error.localizedDescription)
-                }
+            
+        case Sections.TopRated.rawValue:
+            APICaller.shared.getTopRatedMovies { [weak self] result in
+                self?.handleAPIResponse(result, for: cell)
             }
-        default :
-            UITableViewCell()
+            
+        default:
+            return UITableViewCell()
         }
+        
         return cell
+    }
+    
+    // Helper method to handle API responses
+    private func handleAPIResponse(_ result: Result<[Title], Error>, for cell: CollectionTableViewCell) {
+        DispatchQueue.main.async {
+            switch result {
+            case .success(let titles):
+                cell.hideSkeletonLoading()
+                cell.configure(with: titles)
+                
+            case .failure(let error):
+                cell.hideSkeletonLoading()
+                cell.showError(message: error.localizedDescription)
+                print("Error: \(error.localizedDescription)")
+            }
+        }
     }
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
@@ -151,11 +231,20 @@ extension HomeViewController : UITableViewDelegate, UITableViewDataSource{
     }
     
     func tableView(_ tableView: UITableView, willDisplayHeaderView view: UIView, forSection section: Int) {
-        guard let header = view as? UITableViewHeaderFooterView else {return}
+        guard let header = view as? UITableViewHeaderFooterView else { return }
+        
+        // Style the header
         header.textLabel?.font = .systemFont(ofSize: 18, weight: .semibold)
-        header.textLabel?.frame = CGRect(x: header.bounds.origin.x + 20, y: header.bounds.origin.y, width: 100, height: header.bounds.height)
         header.textLabel?.textColor = .label
         header.textLabel?.text = header.textLabel?.text?.capitalizeFirstLetter()
+        
+        // Update frame for better positioning
+        if let textLabel = header.textLabel {
+            textLabel.frame = CGRect(x: 20,
+                                    y: header.bounds.origin.y,
+                                    width: header.bounds.width - 40,
+                                    height: header.bounds.height)
+        }
     }
     
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
@@ -165,19 +254,20 @@ extension HomeViewController : UITableViewDelegate, UITableViewDataSource{
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         let defaultOffset = view.safeAreaInsets.top
         let offset = scrollView.contentOffset.y + defaultOffset
+        
+        // Animate navbar hiding when scrolling down
         navigationController?.navigationBar.transform = .init(translationX: 0, y: min(0, -offset))
     }
-    
-    
 }
 
-extension HomeViewController : ColletionViewTableViewCellDelegate {
+// MARK: - ColletionViewTableViewCellDelegate
+
+extension HomeViewController: ColletionViewTableViewCellDelegate {
     func colletionViewTableViewCellDidTapCell(_ cell: CollectionTableViewCell, viewModel: TitlePreviewViewModel) {
         DispatchQueue.main.async { [weak self] in
             let vc = TitlePreviewViewController()
             vc.configure(with: viewModel)
             self?.navigationController?.pushViewController(vc, animated: true)
         }
-        
     }
 }

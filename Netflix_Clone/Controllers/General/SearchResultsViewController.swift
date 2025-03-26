@@ -54,7 +54,7 @@ extension SearchResultsViewController : UICollectionViewDelegate, UICollectionVi
         }
         cell.backgroundColor = .red
         let title = titles[indexPath.row]
-        cell.configure(with: title.poster_path ?? "")
+        cell.configure(with: title.posterPath ?? "")
         return cell
     }
 
@@ -62,11 +62,11 @@ extension SearchResultsViewController : UICollectionViewDelegate, UICollectionVi
         collectionView.deselectItem(at: indexPath, animated: true)
         
         let title = titles[indexPath.row]
-        let titleName = title.original_title ?? ""
-        APICller.shared.getMovie(with: titleName) { [weak self] result in
+        let titleName = title.originalTitle ?? ""
+        APICaller.shared.getMovie(with: titleName) { [weak self] result in
             switch result {
             case .success(let videoElement):
-                self?.delegate?.searchResultsViewControllerDidTapItem(TitlePreviewViewModel(title: title.original_title ?? "", youtubeView: videoElement, titleOverview: title.overview ?? ""))
+                self?.delegate?.searchResultsViewControllerDidTapItem(TitlePreviewViewModel(title: title.originalTitle ?? "", youtubeView: videoElement, titleOverview: title.overview ?? ""))
 
                 
             case .failure(let error):

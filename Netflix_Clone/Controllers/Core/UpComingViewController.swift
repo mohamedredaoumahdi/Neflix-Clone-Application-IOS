@@ -36,7 +36,7 @@ class UpComingViewController: UIViewController {
     }
     
     func fetchUpComingMovies(){
-        APICller.shared.getUPComingMovies { [weak self] result in
+        APICaller.shared.getUPComingMovies { [weak self] result in
             switch result {
             case .success(let titles) :
                 self?.titiles = titles
@@ -62,7 +62,7 @@ extension UpComingViewController : UITableViewDelegate, UITableViewDataSource {
             return TitleTableViewCell()
         }
         let title = titiles[indexPath.row]
-        cell.configure(with: TitleViewModel(titleName: (title.original_title ?? title.original_name ?? "Unknown"), posterURL: title.poster_path ?? ""))
+        cell.configure(with: TitleViewModel(titleName: (title.originalTitle ?? title.originalName ?? "Unknown"), posterURL: title.posterPath ?? ""))
         return cell
     }
     
@@ -75,12 +75,12 @@ extension UpComingViewController : UITableViewDelegate, UITableViewDataSource {
         
         let title = titiles[indexPath.row]
         
-        guard let titleName = title.original_title ?? title.original_name else {
+        guard let titleName = title.originalTitle ?? title.originalName else {
             return
         }
         
         
-        APICller.shared.getMovie(with: titleName) { [weak self] result in
+        APICaller.shared.getMovie(with: titleName) { [weak self] result in
             switch result {
             case .success(let videoElement):
                 DispatchQueue.main.async {

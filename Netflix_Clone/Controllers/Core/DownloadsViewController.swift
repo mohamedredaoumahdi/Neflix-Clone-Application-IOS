@@ -113,7 +113,7 @@ extension DownloadsViewController: UITableViewDelegate, UITableViewDataSource {
         }
         
         
-        APICller.shared.getMovie(with: titleName) { [weak self] result in
+        APICaller.shared.getMovie(with: titleName) { [weak self] result in
             switch result {
             case .success(let videoElement):
                 DispatchQueue.main.async {

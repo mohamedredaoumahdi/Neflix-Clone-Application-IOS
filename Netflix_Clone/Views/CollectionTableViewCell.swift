@@ -1,132 +1,368 @@
+// CollectionTableViewCell.swift
+// Netflix_Clone
 //
-//  CollectionTableViewCell.swift
-//  Netflix_Clone
-//
-//  Created by mohamed reda oumahdi on 27/02/2024.
+// Created by mohamed reda oumahdi on 27/02/2024.
+// Updated on 27/03/2025.
 //
 
 import UIKit
-import SwiftUI
 
 protocol ColletionViewTableViewCellDelegate: AnyObject {
     func colletionViewTableViewCellDidTapCell(_ cell: CollectionTableViewCell, viewModel: TitlePreviewViewModel)
 }
 
 class CollectionTableViewCell: UITableViewCell {
-
-    static let  identifier = "CollectionTableViewCell"
     
-    weak var delegate : ColletionViewTableViewCellDelegate?
+    // MARK: - Properties
     
-    private var titiles : [Title] = [Title]()
+    static let identifier = "CollectionTableViewCell"
     
-    private let collectionView : UICollectionView = {
+    weak var delegate: ColletionViewTableViewCellDelegate?
+    
+    private var titles: [Title] = []
+    
+    // MARK: - UI Components
+    
+    private let collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.itemSize = CGSize(width: 140, height: 200)
         layout.scrollDirection = .horizontal
+        layout.minimumInteritemSpacing = 10
+        layout.minimumLineSpacing = 10
+        layout.sectionInset = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
+        
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.register(TitleCollectionViewCell.self, forCellWithReuseIdentifier: TitleCollectionViewCell.identifier)
+        collectionView.showsHorizontalScrollIndicator = false
+        collectionView.backgroundColor = .systemBackground
         return collectionView
     }()
     
+    private let errorView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .systemBackground
+        view.isHidden = true
+        return view
+    }()
+    
+    private let errorLabel: UILabel = {
+        let label = UILabel()
+        label.textAlignment = .center
+        label.textColor = .secondaryLabel
+        label.font = .systemFont(ofSize: 14, weight: .medium)
+        label.numberOfLines = 0
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private let retryButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("Retry", for: .normal)
+        button.tintColor = .systemBlue
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+    
+    // Skeleton views for loading state
+    private var skeletonCells: [UIView] = []
+    
+    // MARK: - Initialization
+    
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
-        contentView.backgroundColor = .systemPink
-        contentView.addSubview(collectionView)
         
-        collectionView.delegate = self
-        collectionView.dataSource = self
+        setupUI()
+        setupSkeletonViews()
     }
     
     required init?(coder: NSCoder) {
-        fatalError()
+        fatalError("init(coder:) has not been implemented")
     }
     
     override func layoutSubviews() {
         super.layoutSubviews()
         collectionView.frame = contentView.bounds
+        errorView.frame = contentView.bounds
+        
+        // Update skeleton views positions
+        updateSkeletonLayout()
     }
     
-    func configure(with titles : [Title]){
-        self.titiles = titles
-        DispatchQueue.main.sync{
-            [weak self] in self?.collectionView.reloadData()
+    // MARK: - Setup Methods
+    
+    private func setupUI() {
+        contentView.backgroundColor = .systemBackground
+        
+        // Collection View
+        contentView.addSubview(collectionView)
+        collectionView.delegate = self
+        collectionView.dataSource = self
+        
+        // Error View
+        contentView.addSubview(errorView)
+        errorView.addSubview(errorLabel)
+        errorView.addSubview(retryButton)
+        
+        NSLayoutConstraint.activate([
+            errorLabel.centerXAnchor.constraint(equalTo: errorView.centerXAnchor),
+            errorLabel.centerYAnchor.constraint(equalTo: errorView.centerYAnchor, constant: -20),
+            errorLabel.leadingAnchor.constraint(equalTo: errorView.leadingAnchor, constant: 20),
+            errorLabel.trailingAnchor.constraint(equalTo: errorView.trailingAnchor, constant: -20),
+            
+            retryButton.centerXAnchor.constraint(equalTo: errorView.centerXAnchor),
+            retryButton.topAnchor.constraint(equalTo: errorLabel.bottomAnchor, constant: 10),
+        ])
+        
+        retryButton.addTarget(self, action: #selector(retryButtonTapped), for: .touchUpInside)
+    }
+    
+    private func setupSkeletonViews() {
+        // Create 5 skeleton cells for loading state
+        for _ in 0..<5 {
+            let skeletonView = UIView()
+            skeletonView.backgroundColor = UIColor.systemGray5
+            skeletonView.layer.cornerRadius = 8
+            contentView.addSubview(skeletonView)
+            skeletonView.isHidden = true
+            skeletonCells.append(skeletonView)
         }
     }
     
-    private func downloadTitleAt(indexPath: IndexPath) {
-           DataPersistenceManager.shared.downloadTitleWith(model: titiles[indexPath.row]) { result in
-               switch result {
-               case .success():
-                   NotificationCenter.default.post(name: NSNotification.Name("downloaded"), object: nil)
-               case .failure(let error):
-                   print(error.localizedDescription)
-               }
-           }
-           
-
-       }
+    private func updateSkeletonLayout() {
+        let cellWidth: CGFloat = 140
+        let cellHeight: CGFloat = 200
+        let spacing: CGFloat = 10
+        let leftInset: CGFloat = 10
+        
+        for (index, view) in skeletonCells.enumerated() {
+            let xPosition = leftInset + CGFloat(index) * (cellWidth + spacing)
+            view.frame = CGRect(x: xPosition, y: contentView.bounds.height/2 - cellHeight/2, width: cellWidth, height: cellHeight)
+            view.layer.cornerRadius = 8
+        }
+    }
+    
+    // MARK: - Public Methods
+    
+    func configure(with titles: [Title]) {
+        print("Configuring cell with \(titles.count) titles")
+        self.titles = titles
+        DispatchQueue.main.async { [weak self] in
+            self?.collectionView.reloadData()
+            print("Collection view reloaded")
+            self?.hideSkeletonLoading()
+            self?.errorView.isHidden = true
+        }
+    }
+    
+    func showSkeletonLoading() {
+        DispatchQueue.main.async { [weak self] in
+            self?.collectionView.isHidden = true
+            self?.errorView.isHidden = true
+            
+            // Show and animate skeleton views
+            for view in self?.skeletonCells ?? [] {
+                view.isHidden = false
+                
+                // Add shimmer effect
+                self?.addShimmerEffect(to: view)
+            }
+        }
+    }
+    
+    func hideSkeletonLoading() {
+        DispatchQueue.main.async { [weak self] in
+            self?.collectionView.isHidden = false
+            
+            // Hide skeleton views and remove animations
+            for view in self?.skeletonCells ?? [] {
+                view.isHidden = true
+                view.layer.removeAllAnimations()
+            }
+        }
+    }
+    
+    func showError(message: String) {
+        DispatchQueue.main.async { [weak self] in
+            self?.collectionView.isHidden = true
+            self?.errorView.isHidden = false
+            self?.errorLabel.text = message
+            
+            // Hide skeleton views
+            for view in self?.skeletonCells ?? [] {
+                view.isHidden = true
+                view.layer.removeAllAnimations()
+            }
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func addShimmerEffect(to view: UIView) {
+        // Create shimmer animation
+        let gradient = CAGradientLayer()
+        gradient.frame = view.bounds
+        gradient.colors = [
+            UIColor.systemGray5.cgColor,
+            UIColor.systemGray3.cgColor,
+            UIColor.systemGray5.cgColor
+        ]
+        gradient.startPoint = CGPoint(x: 0.0, y: 0.5)
+        gradient.endPoint = CGPoint(x: 1.0, y: 0.5)
+        gradient.locations = [0.0, 0.5, 1.0]
+        view.layer.addSublayer(gradient)
+        
+        // Add animation
+        let animation = CABasicAnimation(keyPath: "locations")
+        animation.fromValue = [-1.0, -0.5, 0.0]
+        animation.toValue = [1.0, 1.5, 2.0]
+        animation.duration = 1.5
+        animation.repeatCount = .infinity
+        gradient.add(animation, forKey: "shimmerAnimation")
+    }
+    
+    @objc private func retryButtonTapped() {
+        // Notify parent view controller to retry loading
+        showSkeletonLoading()
+        // The HomeViewController will handle reloading this section
+    }
 }
 
-extension CollectionTableViewCell : UICollectionViewDelegate,UICollectionViewDataSource{
+// MARK: - UICollectionViewDelegate, UICollectionViewDataSource
+
+extension CollectionTableViewCell: UICollectionViewDelegate, UICollectionViewDataSource {
+    
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        return titles.count
+    }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: TitleCollectionViewCell.identifier, for: indexPath) as? TitleCollectionViewCell else {
+            print("Failed to dequeue TitleCollectionViewCell")
             return UICollectionViewCell()
         }
-        cell.backgroundColor = .red
-        guard let model = titiles[indexPath.row].poster_path else {
-            return UICollectionViewCell()
+        
+        let title = titles[indexPath.row]
+        print("Title at index \(indexPath.row): \(title.originalTitle ?? "unknown")")
+        print("Properties: posterPath=\(title.posterPath ?? "nil"), mediaType=\(title.mediaType ?? "nil")")
+        
+        if let posterPath = title.posterPath {
+            cell.configure(with: posterPath)
+        } else {
+            cell.posterImageView.image = UIImage(systemName: "film")
+            print("No poster path for title at index \(indexPath.row)")
         }
-        cell.configure(with: model)
+        
         return cell
     }
-
-    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return titiles.count
-    }
-    
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-            collectionView.deselectItem(at: indexPath, animated: true)
+        collectionView.deselectItem(at: indexPath, animated: true)
+        
+        let title = titles[indexPath.row]
+        
+        // Get title name
+        guard let titleName = title.originalTitle ?? title.originalName else {
+            return
+        }
+        
+        // Show loading indicator before fetching trailer
+        LoadingView.shared.showLoading(in: self.window ?? UIView(), withText: "Loading trailer...")
+        
+        // Get trailer from YouTube API
+        APICaller.shared.getMovie(with: titleName + " trailer") { [weak self] result in
+            // Hide loading indicator
+            LoadingView.shared.hideLoading()
             
-            let title = titiles[indexPath.row]
-            guard let titleName = title.original_title ?? title.original_name else {
-                return
-            }
-            APICller.shared.getMovie(with: titleName + " trailer") { [weak self] result in
-                switch result {
-                case .success(let videoElement):
-                    let title = self?.titiles[indexPath.row]
-                    guard let titleOverview = title?.overview else {
-                        return
-                    }
-                    guard let strongSelf = self else{
-                        return
-                    }
-                    let viewModel = TitlePreviewViewModel(title: titleName, youtubeView: videoElement, titleOverview: titleOverview)
-                    self?.delegate?.colletionViewTableViewCellDidTapCell(strongSelf, viewModel: viewModel)
-                case .failure(let error):
-                    print(error.localizedDescription)
-                }
+            switch result {
+            case .success(let videoElement):
+                // Create view model for selected title
+                guard let overview = title.overview else { return }
                 
+                let viewModel = TitlePreviewViewModel(
+                    title: titleName,
+                    youtubeView: videoElement,
+                    titleOverview: overview,
+                    releaseDate: title.releaseDate,
+                    voteAverage: title.voteAverage
+                )
+                
+                // Notify delegate of cell tap
+                guard let strongSelf = self else { return }
+                self?.delegate?.colletionViewTableViewCellDidTapCell(strongSelf, viewModel: viewModel)
+                
+            case .failure(let error):
+                // Handle error
+                print("Failed to get YouTube video: \(error.localizedDescription)")
+                
+                // Show error alert
+                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                   let rootViewController = windowScene.windows.first?.rootViewController {
+                    ErrorPresenter.showError(error, on: rootViewController)
+                }
             }
         }
+    }
     
     func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
         
         let config = UIContextMenuConfiguration(
             identifier: nil,
-            previewProvider: nil) {[weak self] _ in
-                let downloadAction = UIAction(title: "Download", subtitle: nil, image: nil, identifier: nil, discoverabilityTitle: nil, state: .off) { _ in
-                    self?.downloadTitleAt(indexPath: indexPath)
+            previewProvider: { [weak self] in
+                // Create a preview view controller
+                let previewVC = TitlePreviewViewController()
+                
+                if let title = self?.titles[indexPath.row],
+                   let titleName = title.originalTitle ?? title.originalName,
+                   let overview = title.overview {
+                    
+                    // Create a simple preview without the YouTube video
+                    let viewModel = TitlePreviewViewModel(
+                        title: titleName,
+                        youtubeView: nil,
+                        titleOverview: overview,
+                        releaseDate: title.releaseDate,
+                        voteAverage: title.voteAverage
+                    )
+                    
+                    previewVC.configure(with: viewModel)
                 }
-                return UIMenu(title: "", image: nil, identifier: nil, options: .displayInline, children: [downloadAction])
+                
+                return previewVC
+            },
+            actionProvider: { _ in
+                let saveAction = UIAction(
+                    title: "Add to My List",
+                    image: UIImage(systemName: "plus"),
+                    identifier: nil
+                ) { _ in
+                    // Implementation for adding to watchlist
+                    // This would be implemented in Phase 5
+                    print("Added to watchlist: \(self.titles[indexPath.row].originalTitle ?? "Unknown")")
+                }
+                
+                let shareAction = UIAction(
+                    title: "Share",
+                    image: UIImage(systemName: "square.and.arrow.up"),
+                    identifier: nil
+                ) { _ in
+                    // Share functionality
+                    let title = self.titles[indexPath.row]
+                    let titleName = title.originalTitle ?? title.originalName ?? "Movie"
+                    let activityVC = UIActivityViewController(
+                        activityItems: ["Check out '\(titleName)' on Netflix Clone!"],
+                        applicationActivities: nil
+                    )
+                    
+                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                       let rootViewController = windowScene.windows.first?.rootViewController {
+                        rootViewController.present(activityVC, animated: true)
+                    }
+                }
+                
+                return UIMenu(title: "", children: [saveAction, shareAction])
             }
+        )
         
         return config
     }
-    
-    
-    
 }

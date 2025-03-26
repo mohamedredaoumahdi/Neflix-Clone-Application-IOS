@@ -1,37 +1,75 @@
+// MainTabBarViewController.swift
+// Netflix_Clone
 //
-//  ViewController.swift
-//  Netflix_Clone
-//
-//  Created by mohamed reda oumahdi on 27/02/2024.
+// Created by mohamed reda oumahdi on 27/02/2024.
+// Updated on 27/03/2025.
 //
 
 import UIKit
 
 class MainTabBarViewController: UITabBarController {
 
+    // MARK: - Lifecycle Methods
+    
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemYellow
-        
-        let vc1 = UINavigationController(rootViewController: HomeViewController())
-        let vc2 = UINavigationController(rootViewController: UpComingViewController())
-        let vc3 = UINavigationController(rootViewController: SearchViewController())
-        let vc4 = UINavigationController(rootViewController: DownloadsViewController())
-        
-        vc1.tabBarItem.image = UIImage(systemName: "house")
-        vc2.tabBarItem.image = UIImage(systemName: "play.circle")
-        vc3.tabBarItem.image = UIImage(systemName: "magnifyingglass")
-        vc4.tabBarItem.image = UIImage(systemName: "arrow.down.to.line")
-        
-        vc1.title = "Home"
-        vc2.title = "Coming Soon"
-        vc3.title = "Top Search"
-        vc4.title = "Downloads"
-        
-        tabBar.tintColor = .label
-        setViewControllers([vc1, vc2, vc3, vc4], animated: true)
+        setupViewControllers()
+        configureAppearance()
     }
-
-
+    
+    // MARK: - Setup Methods
+    
+    private func setupViewControllers() {
+        // Home tab
+        let homeVC = UINavigationController(rootViewController: HomeViewController())
+        homeVC.tabBarItem = UITabBarItem(title: "Home", image: UIImage(systemName: "house"), tag: 0)
+        
+        // Upcoming tab
+        let upcomingVC = UINavigationController(rootViewController: UpComingViewController())
+        upcomingVC.tabBarItem = UITabBarItem(title: "Coming Soon", image: UIImage(systemName: "play.circle"), tag: 1)
+        
+        // Search tab
+        let searchVC = UINavigationController(rootViewController: SearchViewController())
+        searchVC.tabBarItem = UITabBarItem(title: "Search", image: UIImage(systemName: "magnifyingglass"), tag: 2)
+        
+        // My List tab - This will be implemented in Phase 5
+        let myListVC = UINavigationController(rootViewController: DownloadsViewController())
+        myListVC.tabBarItem = UITabBarItem(title: "My List", image: UIImage(systemName: "list.bullet"), tag: 3)
+        
+        // Set view controllers
+        setViewControllers([homeVC, upcomingVC, searchVC, myListVC], animated: false)
+    }
+    
+    private func configureAppearance() {
+        // Set tab bar appearance
+        tabBar.tintColor = .systemRed
+        tabBar.unselectedItemTintColor = .systemGray
+        
+        // Add slight transparency
+        tabBar.backgroundImage = UIImage()
+        tabBar.shadowImage = UIImage()
+        tabBar.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.95)
+        
+        // Add a top border
+        let topBorder = CALayer()
+        topBorder.frame = CGRect(x: 0, y: 0, width: tabBar.frame.width, height: 0.5)
+        topBorder.backgroundColor = UIColor.separator.cgColor
+        tabBar.layer.addSublayer(topBorder)
+        
+        // Set selected indicator
+        if #available(iOS 15.0, *) {
+            let appearance = UITabBarAppearance()
+            appearance.configureWithOpaqueBackground()
+            appearance.backgroundColor = UIColor.systemBackground
+            
+            appearance.stackedLayoutAppearance.selected.iconColor = .systemRed
+            appearance.stackedLayoutAppearance.selected.titleTextAttributes = [NSAttributedString.Key.foregroundColor: UIColor.systemRed]
+            
+            appearance.stackedLayoutAppearance.normal.iconColor = .systemGray
+            appearance.stackedLayoutAppearance.normal.titleTextAttributes = [NSAttributedString.Key.foregroundColor: UIColor.systemGray]
+            
+            tabBar.standardAppearance = appearance
+            tabBar.scrollEdgeAppearance = tabBar.standardAppearance
+        }
+    }
 }
-
