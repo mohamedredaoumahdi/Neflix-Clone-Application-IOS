@@ -15,6 +15,14 @@
 		162FB6102D9381B300DE66CB /* UIHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 162FB60F2D9381B300DE66CB /* UIHelpers.swift */; };
 		162FB6122D9383B800DE66CB /* ContentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 162FB6112D9383B800DE66CB /* ContentService.swift */; };
 		162FB6162D93AD0100DE66CB /* CastCollectionViewCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 162FB6152D93AD0100DE66CB /* CastCollectionViewCell.swift */; };
+		162FB6182D93BCF200DE66CB /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 162FB6172D93BCF200DE66CB /* DesignSystem.swift */; };
+		162FB61A2D93BD1500DE66CB /* AnimationHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 162FB6192D93BD1500DE66CB /* AnimationHelper.swift */; };
+		162FB61C2D93BD3000DE66CB /* WatchlistManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 162FB61B2D93BD3000DE66CB /* WatchlistManager.swift */; };
+		162FB61E2D93BE0500DE66CB /* VideoPlayerViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 162FB61D2D93BE0500DE66CB /* VideoPlayerViewController.swift */; };
+		162FB6202D93BE3B00DE66CB /* WatchlistViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 162FB61F2D93BE3B00DE66CB /* WatchlistViewController.swift */; };
+		162FB6222D93BE9400DE66CB /* ContentCalendarViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 162FB6212D93BE9400DE66CB /* ContentCalendarViewController.swift */; };
+		162FB6272D93C22B00DE66CB /* WatchlistItem+CoreDataClass.swift in Sources */ = {isa = PBXBuildFile; fileRef = 162FB6232D93C22B00DE66CB /* WatchlistItem+CoreDataClass.swift */; };
+		162FB6282D93C22B00DE66CB /* WatchlistItem+CoreDataProperties.swift in Sources */ = {isa = PBXBuildFile; fileRef = 162FB6242D93C22B00DE66CB /* WatchlistItem+CoreDataProperties.swift */; };
 		16592D212BD5115E006824D5 /* TitlePreviewViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16592D202BD5115E006824D5 /* TitlePreviewViewController.swift */; };
 		16592D232BD5319B006824D5 /* TitlePreviewViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16592D222BD5319B006824D5 /* TitlePreviewViewModel.swift */; };
 		16592D262BD5578B006824D5 /* NetflixCloneModel.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = 16592D242BD5578B006824D5 /* NetflixCloneModel.xcdatamodeld */; };
@@ -51,6 +59,14 @@
 		162FB60F2D9381B300DE66CB /* UIHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIHelpers.swift; sourceTree = "<group>"; };
 		162FB6112D9383B800DE66CB /* ContentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentService.swift; sourceTree = "<group>"; };
 		162FB6152D93AD0100DE66CB /* CastCollectionViewCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastCollectionViewCell.swift; sourceTree = "<group>"; };
+		162FB6172D93BCF200DE66CB /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		162FB6192D93BD1500DE66CB /* AnimationHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationHelper.swift; sourceTree = "<group>"; };
+		162FB61B2D93BD3000DE66CB /* WatchlistManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchlistManager.swift; sourceTree = "<group>"; };
+		162FB61D2D93BE0500DE66CB /* VideoPlayerViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoPlayerViewController.swift; sourceTree = "<group>"; };
+		162FB61F2D93BE3B00DE66CB /* WatchlistViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchlistViewController.swift; sourceTree = "<group>"; };
+		162FB6212D93BE9400DE66CB /* ContentCalendarViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentCalendarViewController.swift; sourceTree = "<group>"; };
+		162FB6232D93C22B00DE66CB /* WatchlistItem+CoreDataClass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WatchlistItem+CoreDataClass.swift"; sourceTree = "<group>"; };
+		162FB6242D93C22B00DE66CB /* WatchlistItem+CoreDataProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WatchlistItem+CoreDataProperties.swift"; sourceTree = "<group>"; };
 		16592D202BD5115E006824D5 /* TitlePreviewViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TitlePreviewViewController.swift; sourceTree = "<group>"; };
 		16592D222BD5319B006824D5 /* TitlePreviewViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TitlePreviewViewModel.swift; sourceTree = "<group>"; };
 		16592D252BD5578B006824D5 /* NetflixCloneModel.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = NetflixCloneModel.xcdatamodel; sourceTree = "<group>"; };
@@ -94,6 +110,8 @@
 		16A8314C2B8E3A2C00CF9FB1 = {
 			isa = PBXGroup;
 			children = (
+				162FB6232D93C22B00DE66CB /* WatchlistItem+CoreDataClass.swift */,
+				162FB6242D93C22B00DE66CB /* WatchlistItem+CoreDataProperties.swift */,
 				16A831572B8E3A2C00CF9FB1 /* Netflix_Clone */,
 				16A831562B8E3A2C00CF9FB1 /* Products */,
 			);
@@ -174,6 +192,8 @@
 			children = (
 				16A831822B962AC300CF9FB1 /* Extensions.swift */,
 				162FB60F2D9381B300DE66CB /* UIHelpers.swift */,
+				162FB6172D93BCF200DE66CB /* DesignSystem.swift */,
+				162FB6192D93BD1500DE66CB /* AnimationHelper.swift */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -186,6 +206,7 @@
 				162FB6052D93804E00DE66CB /* Configuration.swift */,
 				162FB6092D93809600DE66CB /* ErrorPresenter.swift */,
 				162FB6112D9383B800DE66CB /* ContentService.swift */,
+				162FB61B2D93BD3000DE66CB /* WatchlistManager.swift */,
 			);
 			path = Managers;
 			sourceTree = "<group>";
@@ -197,6 +218,8 @@
 				16A8316F2B8E3FAD00CF9FB1 /* UpComingViewController.swift */,
 				16A831712B8E3FE500CF9FB1 /* SearchViewController.swift */,
 				16A831732B8E401D00CF9FB1 /* DownloadsViewController.swift */,
+				162FB61F2D93BE3B00DE66CB /* WatchlistViewController.swift */,
+				162FB6212D93BE9400DE66CB /* ContentCalendarViewController.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -206,6 +229,7 @@
 			children = (
 				16FC9F252B99050F0037E654 /* SearchResultsViewController.swift */,
 				16592D202BD5115E006824D5 /* TitlePreviewViewController.swift */,
+				162FB61D2D93BE0500DE66CB /* VideoPlayerViewController.swift */,
 			);
 			path = General;
 			sourceTree = "<group>";
@@ -292,8 +316,12 @@
 				16A8315D2B8E3A2C00CF9FB1 /* MainTabBarViewController.swift in Sources */,
 				162FB6102D9381B300DE66CB /* UIHelpers.swift in Sources */,
 				16592D282BD8EB7E006824D5 /* DataPersistenceManager.swift in Sources */,
+				162FB6282D93C22B00DE66CB /* WatchlistItem+CoreDataProperties.swift in Sources */,
 				16A831742B8E401D00CF9FB1 /* DownloadsViewController.swift in Sources */,
+				162FB6272D93C22B00DE66CB /* WatchlistItem+CoreDataClass.swift in Sources */,
+				162FB6182D93BCF200DE66CB /* DesignSystem.swift in Sources */,
 				16A8317F2B95FDBF00CF9FB1 /* APICaller.swift in Sources */,
+				162FB61A2D93BD1500DE66CB /* AnimationHelper.swift in Sources */,
 				16A8317D2B912E2D00CF9FB1 /* HeroHeaderUIView.swift in Sources */,
 				16592D262BD5578B006824D5 /* NetflixCloneModel.xcdatamodeld in Sources */,
 				16A831592B8E3A2C00CF9FB1 /* AppDelegate.swift in Sources */,
@@ -303,6 +331,8 @@
 				16FC9F262B99050F0037E654 /* SearchResultsViewController.swift in Sources */,
 				162FB6162D93AD0100DE66CB /* CastCollectionViewCell.swift in Sources */,
 				16A831832B962AC300CF9FB1 /* Extensions.swift in Sources */,
+				162FB6222D93BE9400DE66CB /* ContentCalendarViewController.swift in Sources */,
+				162FB61E2D93BE0500DE66CB /* VideoPlayerViewController.swift in Sources */,
 				169012D12B9F568200BCF25A /* YoutubeSearchResponse.swift in Sources */,
 				16A8318E2B96471F00CF9FB1 /* Title.swift in Sources */,
 				16592D232BD5319B006824D5 /* TitlePreviewViewModel.swift in Sources */,
@@ -314,8 +344,10 @@
 				162FB6122D9383B800DE66CB /* ContentService.swift in Sources */,
 				16A8316E2B8E3F6000CF9FB1 /* HomeViewController.swift in Sources */,
 				16A8317B2B8E4F2600CF9FB1 /* CollectionTableViewCell.swift in Sources */,
+				162FB6202D93BE3B00DE66CB /* WatchlistViewController.swift in Sources */,
 				16FC9F242B98DADA0037E654 /* TitleViewModel.swift in Sources */,
 				162FB6082D93806F00DE66CB /* LoadingView.swift in Sources */,
+				162FB61C2D93BD3000DE66CB /* WatchlistManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

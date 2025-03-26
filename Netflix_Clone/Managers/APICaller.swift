@@ -258,3 +258,126 @@ class APICaller {
     
     
 }
+
+
+// Add these methods to your APICaller class to support the Calendar functionality
+
+extension APICaller {
+    
+    // Get upcoming TV shows (released in the future)
+    func getUpcomingTVShows(completion: @escaping (Result<[Title], Error>) -> Void) {
+        guard let url = URL(string: "\(Configuration.URLs.TMDB_BASE_URL)/tv/on_the_air?language=en-US&page=1") else {
+            completion(.failure(APIError.invalidURL))
+            return
+        }
+        
+        let request = createRequest(with: url)
+        executeRequest(request: request) { (result: Result<TrendingTitleResponse, Error>) in
+            switch result {
+            case .success(let response):
+                // Filter for upcoming shows by checking if air date is in the future
+                let calendar = Calendar.current
+                let currentDate = Date()
+                
+                let upcomingShows = response.results.filter { title in
+                    if let firstAirDateString = title.firstAirDate,
+                       let date = DateFormatter.yearFormatter.date(from: firstAirDateString) {
+                        return date > currentDate
+                    }
+                    return false
+                }
+                
+                completion(.success(upcomingShows))
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
+    }
+    
+    // Get all upcoming content (movies and TV shows) for a unified calendar view
+    func getUpcomingContent(completion: @escaping (Result<[Title], Error>) -> Void) {
+        let dispatchGroup = DispatchGroup()
+        
+        var movies: [Title] = []
+        var tvShows: [Title] = []
+        var fetchError: Error?
+        
+        // Fetch upcoming movies
+        dispatchGroup.enter()
+        getUPComingMovies { result in
+            switch result {
+            case .success(let titles):
+                movies = titles.map { title in
+                    var mutableTitle = title
+                    if mutableTitle.mediaType == nil {
+                        mutableTitle.mediaType = "movie"
+                    }
+                    return mutableTitle
+                }
+            case .failure(let error):
+                fetchError = error
+            }
+            dispatchGroup.leave()
+        }
+        
+        // Fetch upcoming TV shows
+        dispatchGroup.enter()
+        getUpcomingTVShows { result in
+            switch result {
+            case .success(let titles):
+                tvShows = titles.map { title in
+                    var mutableTitle = title
+                    if mutableTitle.mediaType == nil {
+                        mutableTitle.mediaType = "tv"
+                    }
+                    return mutableTitle
+                }
+            case .failure(let error):
+                if fetchError == nil {
+                    fetchError = error
+                }
+            }
+            dispatchGroup.leave()
+        }
+        
+        // Process results when both calls complete
+        dispatchGroup.notify(queue: .main) {
+            if let error = fetchError {
+                completion(.failure(error))
+                return
+            }
+            
+            // Combine and sort by release date
+            let allTitles = (movies + tvShows).sorted {
+                let date1 = DateFormatter.yearFormatter.date(from: $0.releaseDate ?? $0.firstAirDate ?? "") ?? Date.distantFuture
+                let date2 = DateFormatter.yearFormatter.date(from: $1.releaseDate ?? $1.firstAirDate ?? "") ?? Date.distantFuture
+                return date1 < date2
+            }
+            
+            completion(.success(allTitles))
+        }
+    }
+    
+    // Get releases for a specific date range
+    func getReleasesInDateRange(from startDate: Date, to endDate: Date, completion: @escaping (Result<[Title], Error>) -> Void) {
+        // First get all upcoming content
+        getUpcomingContent { result in
+            switch result {
+            case .success(let titles):
+                // Filter by date range
+                let filteredTitles = titles.filter { title in
+                    if let dateString = title.releaseDate ?? title.firstAirDate,
+                       let releaseDate = DateFormatter.yearFormatter.date(from: dateString) {
+                        return releaseDate >= startDate && releaseDate <= endDate
+                    }
+                    return false
+                }
+                
+                completion(.success(filteredTitles))
+                
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
+    }
+}
