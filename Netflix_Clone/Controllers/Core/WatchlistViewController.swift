@@ -5,6 +5,7 @@
 //
 
 import UIKit
+import CoreData
 
 class WatchlistViewController: UIViewController {
     

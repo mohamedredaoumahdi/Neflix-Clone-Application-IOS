@@ -89,19 +89,13 @@ class TitleCollectionViewCell: UICollectionViewCell {
     // MARK: - Configuration
     
     public func configure(with model: String) {
-        print("Configuring cell with poster path: \(model)")
         loadingIndicator.startAnimating()
-        
-        // Make sure model is not empty
-
+            
         guard !model.isEmpty else {
-
             print("Empty poster path")
-
             posterImageView.image = UIImage(systemName: "film")
-
+            loadingIndicator.stopAnimating() // Add this line
             return
-
         }
         // Construct image URL
         let imageURL = "\(Configuration.URLs.TMDB_IMAGE_URL)/\(model)"

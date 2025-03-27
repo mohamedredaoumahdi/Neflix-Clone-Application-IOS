@@ -7,6 +7,7 @@
 
 
 import UIKit
+import CoreData
 
 class DownloadsViewController: UIViewController {
     
@@ -37,17 +38,17 @@ class DownloadsViewController: UIViewController {
     
     
     private func fetchLocalStorageForDownload() {
-
-        
         DataPersistenceManager.shared.fetchingTitlesFromDataBase { [weak self] result in
-            switch result {
-            case .success(let titles):
-                self?.titles = titles
-                DispatchQueue.main.async {
-                    self?.downloadedTable.reloadData()
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let titles):
+                    self.titles = titles
+                    self.downloadedTable.reloadData()
+                case .failure(let error):
+                    print(error.localizedDescription)
                 }
-            case .failure(let error):
-                print(error.localizedDescription)
             }
         }
     }

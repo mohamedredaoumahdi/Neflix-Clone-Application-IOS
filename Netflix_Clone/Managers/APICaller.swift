@@ -142,21 +142,16 @@ class APICaller {
         }
     }
     
-    func getUPComingMovies(completion: @escaping (Result<[Title], Error>) -> Void) {
-        guard let url = URL(string: "\(Configuration.URLs.TMDB_BASE_URL)/movie/upcoming?language=en-US&page=1") else {
+    // In APICaller.swift
+    // Extended version with full response
+    func getUPComingMovies(withFullResponse page: Int = 1, completion: @escaping (Result<TrendingTitleResponse, Error>) -> Void) {
+        guard let url = URL(string: "\(Configuration.URLs.TMDB_BASE_URL)/movie/upcoming?language=en-US&page=\(page)") else {
             completion(.failure(APIError.invalidURL))
             return
         }
         
         let request = createRequest(with: url)
-        executeRequest(request: request) { (result: Result<TrendingTitleResponse, Error>) in
-            switch result {
-            case .success(let response):
-                completion(.success(response.results))
-            case .failure(let error):
-                completion(.failure(error))
-            }
-        }
+        executeRequest(request: request, completion: completion)
     }
     
     func getTopRatedMovies(completion: @escaping (Result<[Title], Error>) -> Void) {

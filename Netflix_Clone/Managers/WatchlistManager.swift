@@ -57,7 +57,7 @@ class WatchlistManager {
         }
         
         let context = appDelegate.persistentContainer.viewContext
-        let watchlistItem = WatchlistItem(context: context)
+        let watchlistItem = Netflix_Clone.WatchlistItem(context: context)
         
         // Set properties
         watchlistItem.id = Int64(title.id)

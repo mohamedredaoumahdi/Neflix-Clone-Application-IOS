@@ -7,7 +7,15 @@
 
 import Foundation
 
-struct TitleViewModel{
-    let titleName : String
-    let posterURL : String
+struct TitleViewModel {
+    let titleName: String
+    let posterURL: String
+    let releaseDate: String?
+    
+    // Default initializer for backward compatibility
+    init(titleName: String, posterURL: String, releaseDate: String? = nil) {
+        self.titleName = titleName
+        self.posterURL = posterURL
+        self.releaseDate = releaseDate
+    }
 }

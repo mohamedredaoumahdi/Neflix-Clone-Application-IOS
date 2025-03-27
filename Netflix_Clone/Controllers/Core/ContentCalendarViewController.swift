@@ -5,6 +5,7 @@
 //
 
 import UIKit
+import EventKit
 
 class ContentCalendarViewController: UIViewController {
     
@@ -298,40 +299,53 @@ class ContentCalendarViewController: UIViewController {
             return
         }
         
-        // Create calendar event
+        // Create calendar event with proper permission handling
         let eventStore = EKEventStore()
         
-        eventStore.requestAccess(to: .event) { [weak self] granted, error in
-            guard granted, error == nil else {
-                DispatchQueue.main.async {
-                    ErrorPresenter.showError(AppError.apiError("Calendar access denied. Please enable in Settings."), on: self!)
-                }
-                return
+        if #available(iOS 17.0, *) {
+            eventStore.requestFullAccessToEvents { [weak self] granted, error in
+                self?.handleCalendarAccess(granted: granted, error: error, eventStore: eventStore, title: title, releaseDate: releaseDate)
             }
+        } else {
+            eventStore.requestAccess(to: .event) { [weak self] granted, error in
+                self?.handleCalendarAccess(granted: granted, error: error, eventStore: eventStore, title: title, releaseDate: releaseDate)
+            }
+        }
+    }
+
+    private func handleCalendarAccess(granted: Bool, error: Error?, eventStore: EKEventStore, title: Title, releaseDate: Date) {
+        guard granted, error == nil else {
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                ErrorPresenter.showError(AppError.apiError("Calendar access denied. Please enable in Settings."), on: self)
+            }
+            return
+        }
+        
+        let event = EKEvent(eventStore: eventStore)
+        event.title = "Release: \(title.displayTitle)"
+        event.notes = title.overview
+        event.startDate = releaseDate
+        event.endDate = releaseDate.addingTimeInterval(3600) // 1 hour duration
+        event.calendar = eventStore.defaultCalendarForNewEvents
+        
+        do {
+            try eventStore.save(event, span: .thisEvent)
             
-            let event = EKEvent(eventStore: eventStore)
-            event.title = "Release: \(title.displayTitle)"
-            event.notes = title.overview
-            event.startDate = releaseDate
-            event.endDate = releaseDate.addingTimeInterval(3600) // 1 hour duration
-            event.calendar = eventStore.defaultCalendarForNewEvents
-            
-            do {
-                try eventStore.save(event, span: .thisEvent)
-                
-                DispatchQueue.main.async {
-                    let alert = UIAlertController(
-                        title: "Reminder Set",
-                        message: "A reminder has been added to your calendar for the release of '\(title.displayTitle)'",
-                        preferredStyle: .alert
-                    )
-                    alert.addAction(UIAlertAction(title: "OK", style: .default))
-                    self?.present(alert, animated: true)
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    ErrorPresenter.showError(AppError.apiError("Failed to create reminder"), on: self!)
-                }
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                let alert = UIAlertController(
+                    title: "Reminder Set",
+                    message: "A reminder has been added to your calendar for the release of '\(title.displayTitle)'",
+                    preferredStyle: .alert
+                )
+                alert.addAction(UIAlertAction(title: "OK", style: .default))
+                self.present(alert, animated: true)
+            }
+        } catch {
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                ErrorPresenter.showError(AppError.apiError("Failed to create reminder"), on: self)
             }
         }
     }

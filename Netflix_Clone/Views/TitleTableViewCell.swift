@@ -66,10 +66,17 @@ class TitleTableViewCell: UITableViewCell {
         NSLayoutConstraint.activate(playButtonConstaint)
     }
     
-    public func configure(with model : TitleViewModel) {
-        guard let url = URL(string: "https://image.tmdb.org/t/p/w500/\(model.posterURL)") else {return}
+    public func configure(with model: TitleViewModel) {
+        guard let url = URL(string: "\(Configuration.URLs.TMDB_IMAGE_URL)/\(model.posterURL)") else {
+            return
+        }
         titlePoserUIImageView.sd_setImage(with: url, completed: nil)
         titleLabel.text = model.titleName
+        
+        // Add release date if available
+        if let releaseDate = model.releaseDate {
+            // You could add a release date label here if desired
+        }
     }
     
     required init?(coder: NSCoder) {

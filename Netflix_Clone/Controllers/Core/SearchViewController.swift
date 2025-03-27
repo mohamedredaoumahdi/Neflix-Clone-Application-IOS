@@ -110,11 +110,12 @@ extension SearchViewController : UITableViewDelegate, UITableViewDataSource {
 
 extension SearchViewController : UISearchResultsUpdating , SearchResultsViewControllerDelegate{
     
+    // Example from SearchViewController
     func searchResultsViewControllerDidTapItem(_ viewController: TitlePreviewViewController) {
-            DispatchQueue.main.async { [weak self] in
-                self?.navigationController?.pushViewController(viewController, animated: true)
-            }
+        DispatchQueue.main.async { [weak self] in
+            self?.navigationController?.pushViewController(viewController, animated: true)
         }
+    }
     
     func updateSearchResults(for searchController: UISearchController) {
         let searchBar = searchController.searchBar
@@ -125,14 +126,16 @@ extension SearchViewController : UISearchResultsUpdating , SearchResultsViewCont
                 return
         }
         resultsController.delegate = self
-        APICaller.shared.searchForMovieByName(with: query) { results in
+        APICaller.shared.searchForMovieByName(with: query) { [weak self] results in
             DispatchQueue.main.async {
-                switch results{
+                switch results {
                 case .success(let titles):
                     resultsController.titles = titles
                     resultsController.searchResultsCollectionView.reloadData()
                 case .failure(let error):
-                    print(error.localizedDescription)
+                    if let self = self {
+                        ErrorPresenter.showError(error, on: self)
+                    }
                 }
             }
         }
