@@ -40,6 +40,7 @@ class CollectionTableViewCell: UITableViewCell {
     weak var delegate: ColletionViewTableViewCellDelegate?
     
     private var titles: [Title] = []
+    private var viewModels: [TitleViewModel] = []
     
     // MARK: - UI Components
     
@@ -163,16 +164,45 @@ class CollectionTableViewCell: UITableViewCell {
     
     // MARK: - Public Methods
     
-    func configure(with titles: [Title]) {
-        print("Configuring cell with \(titles.count) titles")
-        self.titles = titles
-        DispatchQueue.main.async { [weak self] in
-            self?.collectionView.reloadData()
-            print("Collection view reloaded")
-            self?.hideSkeletonLoading()
-            self?.errorView.isHidden = true
+    // Updated configure method to handle recent releases section
+    public func configure(with titles: [Title], isRecentReleasesSection: Bool = false, isTopRatedSection: Bool = false) {
+            self.titles = titles
+            
+            // Create view models based on section type and content
+            self.viewModels = titles.map { title in
+                // Check if it's a new release
+                let isNew = isRecentReleasesSection && isNewRelease(title: title)
+                
+                // Check if it's top rated
+                let isTopRated = isTopRatedSection || (title.voteAverage ?? 0.0 >= 8.0)
+                
+                return TitleViewModel(
+                    titleName: title.displayTitle,
+                    posterURL: title.posterPath ?? "",
+                    releaseDate: title.formattedReleaseDate,
+                    isNewRelease: isNew,
+                    isTopRated: isTopRated
+                )
+            }
+            
+            hideSkeletonLoading()
+            collectionView.reloadData()
         }
-    }
+        
+        // Helper method to determine if a title is a new release
+        private func isNewRelease(title: Title) -> Bool {
+            // Calculate threshold date for "NEW" badge (7 days)
+            let calendar = Calendar.current
+            let oneWeekAgo = calendar.date(byAdding: .day, value: -7, to: Date())!
+            
+            // Get the release date
+            let dateString = title.releaseDate ?? title.firstAirDate ?? ""
+            if let releaseDate = DateFormatter.yearFormatter.date(from: dateString) {
+                // Compare to threshold (e.g., last 7 days)
+                return releaseDate >= oneWeekAgo
+            }
+            return false
+        }
     
     // Returns the currently selected title if there is one, or the first title as a fallback
     func getCurrentTitle() -> Title? {
@@ -269,50 +299,41 @@ class CollectionTableViewCell: UITableViewCell {
 
 extension CollectionTableViewCell: UICollectionViewDelegate, UICollectionViewDataSource {
     
+    
+    
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         return titles.count
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: TitleCollectionViewCell.identifier, for: indexPath) as? TitleCollectionViewCell else {
-            print("Failed to dequeue TitleCollectionViewCell")
             return UICollectionViewCell()
         }
         
-        // Bounds check to prevent crashes
-        if indexPath.row < titles.count {
+        // Use view model if available
+        if indexPath.row < viewModels.count {
+            cell.configure(with: viewModels[indexPath.row])
+        } else if indexPath.row < titles.count {
+            // Fallback to old method
             let title = titles[indexPath.row]
-            print("Title at index \(indexPath.row): \(title.originalTitle ?? "unknown")")
-            print("Properties: posterPath=\(title.posterPath ?? "nil"), mediaType=\(title.mediaType ?? "nil")")
-            
             if let posterPath = title.posterPath {
                 cell.configure(with: posterPath)
-            } else {
-                cell.posterImageView.image = UIImage(systemName: "film")
-                print("No poster path for title at index \(indexPath.row)")
             }
-        } else {
-            print("Index out of bounds: \(indexPath.row) for titles count: \(titles.count)")
-            cell.posterImageView.image = UIImage(systemName: "exclamationmark.triangle")
         }
         
         return cell
     }
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        collectionView.deselectItem(at: indexPath, animated: true)
-        
-        // Bounds check to prevent crashes
-        guard indexPath.row < titles.count else {
-            print("Tried to select out-of-bounds index: \(indexPath.row)")
-            return
+            collectionView.deselectItem(at: indexPath, animated: true)
+            
+            guard indexPath.row < titles.count else { return }
+            
+            let title = titles[indexPath.row]
+            
+            // Use the delegate to pass the title
+            delegate?.collectionViewDidTapCellWithTitle(self, title: title)
         }
-        
-        let title = titles[indexPath.row]
-        
-        // Use the new delegate method naming
-        delegate?.collectionViewDidTapCellWithTitle(self, title: title)
-    }
     
     func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
         // Bounds check to prevent crashes
@@ -360,7 +381,6 @@ extension CollectionTableViewCell: UICollectionViewDelegate, UICollectionViewDat
                         WatchlistManager.shared.addToWatchlist(title: title) { _ in
                             // Implementation could be enhanced with success/failure handling
                         }
-                        print("Added to watchlist: \(title.originalTitle ?? "Unknown")")
                     }
                 }
                 
@@ -391,4 +411,3 @@ extension CollectionTableViewCell: UICollectionViewDelegate, UICollectionViewDat
         return config
     }
 }
-

@@ -1,8 +1,5 @@
-// TitleCollectionViewCell.swift
+// TitleCollectionViewCell.swift - With dynamic badge positioning
 // Netflix_Clone
-//
-// Created by mohamed reda oumahdi on 04/03/2024.
-// Updated on 27/03/2025.
 //
 
 import UIKit
@@ -52,6 +49,58 @@ class TitleCollectionViewCell: UICollectionViewCell {
         return imageView
     }()
     
+    // New badge for recent releases
+    private let newReleaseView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .systemRed
+        view.layer.cornerRadius = 10
+        view.clipsToBounds = true
+        view.isHidden = true // Hidden by default
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    private let newReleaseLabel: UILabel = {
+        let label = UILabel()
+        label.text = "NEW"
+        label.textColor = .white
+        label.font = .systemFont(ofSize: 10, weight: .bold)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    // TOP RATED badge
+    private let topRatedView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .systemYellow
+        view.layer.cornerRadius = 10
+        view.clipsToBounds = true
+        view.isHidden = true // Hidden by default
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    private let topRatedLabel: UILabel = {
+        let label = UILabel()
+        label.text = "TOP"
+        label.textColor = .black // Dark text for better contrast against yellow
+        label.font = .systemFont(ofSize: 10, weight: .bold)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    // Star icon for top rated badge
+    private let starImageView: UIImageView = {
+        let imageView = UIImageView(image: UIImage(systemName: "star.fill"))
+        imageView.contentMode = .scaleAspectFit
+        imageView.tintColor = .black
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+    
+    // Constraints that will be modified dynamically
+    private var topRatedTopConstraint: NSLayoutConstraint?
+    
     // MARK: - Initialization
     
     override init(frame: CGRect) {
@@ -74,6 +123,8 @@ class TitleCollectionViewCell: UICollectionViewCell {
         posterImageView.image = nil
         loadingIndicator.stopAnimating()
         errorImageView.isHidden = true
+        newReleaseView.isHidden = true
+        topRatedView.isHidden = true
     }
     
     // MARK: - Setup Methods
@@ -83,6 +134,15 @@ class TitleCollectionViewCell: UICollectionViewCell {
         posterImageView.layer.addSublayer(gradientOverlay)
         contentView.addSubview(loadingIndicator)
         contentView.addSubview(errorImageView)
+        
+        // Add new release badge
+        newReleaseView.addSubview(newReleaseLabel)
+        contentView.addSubview(newReleaseView)
+        
+        // Add top rated badge with star icon
+        topRatedView.addSubview(starImageView)
+        topRatedView.addSubview(topRatedLabel)
+        contentView.addSubview(topRatedView)
         
         // Add subtle shadow
         contentView.layer.shadowColor = UIColor.black.cgColor
@@ -99,12 +159,71 @@ class TitleCollectionViewCell: UICollectionViewCell {
             errorImageView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             errorImageView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             errorImageView.widthAnchor.constraint(equalToConstant: 40),
-            errorImageView.heightAnchor.constraint(equalToConstant: 40)
+            errorImageView.heightAnchor.constraint(equalToConstant: 40),
+            
+            // New release badge (top right)
+            newReleaseView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
+            newReleaseView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
+            newReleaseView.heightAnchor.constraint(equalToConstant: 20),
+            
+            newReleaseLabel.topAnchor.constraint(equalTo: newReleaseView.topAnchor, constant: 2),
+            newReleaseLabel.bottomAnchor.constraint(equalTo: newReleaseView.bottomAnchor, constant: -2),
+            newReleaseLabel.leadingAnchor.constraint(equalTo: newReleaseView.leadingAnchor, constant: 6),
+            newReleaseLabel.trailingAnchor.constraint(equalTo: newReleaseView.trailingAnchor, constant: -6),
+            
+            // Top rated badge (trailingAnchor stays constant)
+            topRatedView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
+            topRatedView.heightAnchor.constraint(equalToConstant: 20),
+            
+            // Star icon
+            starImageView.leadingAnchor.constraint(equalTo: topRatedView.leadingAnchor, constant: 6),
+            starImageView.centerYAnchor.constraint(equalTo: topRatedView.centerYAnchor),
+            starImageView.widthAnchor.constraint(equalToConstant: 12),
+            starImageView.heightAnchor.constraint(equalToConstant: 12),
+            
+            // Top rated label
+            topRatedLabel.leadingAnchor.constraint(equalTo: starImageView.trailingAnchor, constant: 2),
+            topRatedLabel.trailingAnchor.constraint(equalTo: topRatedView.trailingAnchor, constant: -6),
+            topRatedLabel.centerYAnchor.constraint(equalTo: topRatedView.centerYAnchor)
         ])
+        
+        // Default position for TOP badge (will be updated in configure)
+        topRatedTopConstraint = topRatedView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8)
+        topRatedTopConstraint?.isActive = true
     }
     
     // MARK: - Configuration
     
+    // Updated view model structure with top rated flag
+    public func configure(with viewModel: TitleViewModel) {
+        // Configure poster image
+        if !viewModel.posterURL.isEmpty {
+            configure(with: viewModel.posterURL)
+        }
+        
+        // Determine badge visibility
+        let showNewBadge = viewModel.isNewRelease
+        let showTopBadge = viewModel.isTopRated
+        
+        // Show/hide badges
+        newReleaseView.isHidden = !showNewBadge
+        topRatedView.isHidden = !showTopBadge
+        
+        // Position TOP badge based on whether NEW badge is showing
+        if showNewBadge && showTopBadge {
+            // If both are showing, TOP goes below NEW
+            topRatedTopConstraint?.isActive = false
+            topRatedTopConstraint = topRatedView.topAnchor.constraint(equalTo: newReleaseView.bottomAnchor, constant: 8)
+            topRatedTopConstraint?.isActive = true
+        } else {
+            // If only TOP is showing, it goes in the top position
+            topRatedTopConstraint?.isActive = false
+            topRatedTopConstraint = topRatedView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8)
+            topRatedTopConstraint?.isActive = true
+        }
+    }
+    
+    // Legacy method for backward compatibility
     public func configure(with model: String) {
         // Reset the cell first
         posterImageView.image = nil
@@ -126,7 +245,6 @@ class TitleCollectionViewCell: UICollectionViewCell {
             imageURL = "\(Configuration.URLs.TMDB_IMAGE_URL)/\(model)"
         }
         
-        print("Full image URL: \(imageURL)")
         guard let url = URL(string: imageURL) else {
             print("Invalid image URL: \(imageURL)")
             showErrorState(message: "Invalid URL")
@@ -151,8 +269,6 @@ class TitleCollectionViewCell: UICollectionViewCell {
                 }
                 
                 if image != nil {
-                    print("Image loaded successfully")
-                    
                     // Apply fade-in animation for smoother appearance
                     self?.posterImageView.alpha = 0.0
                     UIView.animate(withDuration: 0.3) {
@@ -173,9 +289,6 @@ class TitleCollectionViewCell: UICollectionViewCell {
         posterImageView.tintColor = .systemGray3
         
         errorImageView.isHidden = false
-        
-        // Log error for debugging
-        print("Image error: \(message)")
     }
     
     // Apply a frosted effect to highlight cell selection

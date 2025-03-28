@@ -12,7 +12,8 @@ enum Sections: Int {
     case TrendingTVShows = 1
     case Popular = 2
     case UpcomingMovies = 3
-    case TopRated = 4
+    case RecentReleases = 4
+    case TopRated = 5
 }
 
 class HomeViewController: UIViewController {
@@ -27,6 +28,7 @@ class HomeViewController: UIViewController {
         "Trending TV Shows",
         "Popular",
         "Upcoming Movies",
+        "Recently Released",
         "Top Rated"
     ]
     
@@ -60,7 +62,7 @@ class HomeViewController: UIViewController {
         homeFeedTable.refreshControl = refreshControl
         refreshControl.addTarget(self, action: #selector(refreshData), for: .valueChanged)
         
-        configureNavBar()
+        //configureNavBar()
         
         headerView = HeroHeaderUIView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: 500))
         homeFeedTable.tableHeaderView = headerView
@@ -84,7 +86,7 @@ class HomeViewController: UIViewController {
     }
     
     // MARK: - Setup Methods
-    
+    /*
     private func configureNavBar() {
         var image = UIImage(named: "netflix_logo")
         image = image?.withRenderingMode(.alwaysOriginal)
@@ -100,7 +102,7 @@ class HomeViewController: UIViewController {
         navigationController?.navigationBar.setBackgroundImage(UIImage(), for: .default)
         navigationController?.navigationBar.shadowImage = UIImage()
     }
-    
+    */
     // MARK: - Data Loading Methods
     
     @objc private func refreshData() {
@@ -182,27 +184,34 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
         switch indexPath.section {
         case Sections.TrendingMovies.rawValue:
             APICaller.shared.getTrendingMovies { [weak self] result in
-                self?.handleAPIResponse(result, for: cell)
+                self?.handleAPIResponse(result, for: cell,section: indexPath.section)
             }
             
         case Sections.TrendingTVShows.rawValue:
             APICaller.shared.getTrendingTVShows { [weak self] result in
-                self?.handleAPIResponse(result, for: cell)
+                self?.handleAPIResponse(result, for: cell,section: indexPath.section)
             }
             
         case Sections.Popular.rawValue:
             APICaller.shared.getPopularMovies { [weak self] result in
-                self?.handleAPIResponse(result, for: cell)
+                self?.handleAPIResponse(result, for: cell,section: indexPath.section)
             }
             
         case Sections.UpcomingMovies.rawValue:
-            APICaller.shared.getUPComingMovies { [weak self] result in
-                self?.handleAPIResponse(result, for: cell)
+            // Use the new sorted method for upcoming movies
+            APICaller.shared.getUpcomingMoviesSorted { [weak self] result in
+                self?.handleAPIResponse(result, for: cell,section: indexPath.section)
+            }
+            
+        case Sections.RecentReleases.rawValue:
+            // Use the new method for recent releases
+            APICaller.shared.getRecentReleases { [weak self] result in
+                self?.handleAPIResponse(result, for: cell, section: indexPath.section)
             }
             
         case Sections.TopRated.rawValue:
             APICaller.shared.getTopRatedMovies { [weak self] result in
-                self?.handleAPIResponse(result, for: cell)
+                self?.handleAPIResponse(result, for: cell,section: indexPath.section)
             }
             
         default:
@@ -212,13 +221,20 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
         return cell
     }
     
-    // Helper method to handle API responses
-    private func handleAPIResponse(_ result: Result<[Title], Error>, for cell: CollectionTableViewCell) {
+    private func handleAPIResponse(_ result: Result<[Title], Error>, for cell: CollectionTableViewCell, section: Int) {
         DispatchQueue.main.async {
             switch result {
             case .success(let titles):
-                cell.hideSkeletonLoading()
-                cell.configure(with: titles)
+                // Check which section we're processing
+                let isRecentReleasesSection = section == Sections.RecentReleases.rawValue
+                let isTopRatedSection = section == Sections.TopRated.rawValue
+                
+                // Configure with appropriate flags
+                cell.configure(
+                    with: titles,
+                    isRecentReleasesSection: isRecentReleasesSection,
+                    isTopRatedSection: isTopRatedSection
+                )
                 
             case .failure(let error):
                 cell.hideSkeletonLoading()
@@ -298,12 +314,9 @@ extension HomeViewController: ColletionViewTableViewCellDelegate {
     
     // New method using the updated naming
     func collectionViewDidTapCellWithViewModel(_ cell: CollectionTableViewCell, viewModel: TitlePreviewViewModel) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            let vc = TitlePreviewViewController()
-            vc.configure(with: viewModel)
-            self.navigationController?.pushViewController(vc, animated: true)
-        }
+        // Present bottom sheet directly with the view model
+        let bottomSheet = ContentDetailBottomSheet(with: viewModel)
+        present(bottomSheet, animated: false)
     }
     
     // Updated method for handling title selection

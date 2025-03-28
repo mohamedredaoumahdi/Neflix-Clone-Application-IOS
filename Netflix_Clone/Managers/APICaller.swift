@@ -389,3 +389,158 @@ extension APICaller {
         }
     }
 }
+
+extension APICaller {
+    func getRecentReleases(completion: @escaping (Result<[Title], Error>) -> Void) {
+        // Calculate date range (last 30 days until today)
+        let today = Date()
+        let calendar = Calendar.current
+        let thirtyDaysAgo = calendar.date(byAdding: .day, value: -30, to: today)!
+        
+        // Format dates for API
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let fromDate = formatter.string(from: thirtyDaysAgo)
+        let toDate = formatter.string(from: today)
+        
+        // For movies
+        let movieURL = "\(Configuration.URLs.TMDB_BASE_URL)/discover/movie?include_adult=false&include_video=false&language=en-US&page=1&primary_release_date.gte=\(fromDate)&primary_release_date.lte=\(toDate)&sort_by=primary_release_date.desc"
+        
+        guard let url = URL(string: movieURL) else {
+            completion(.failure(APIError.invalidURL))
+            return
+        }
+        
+        let dispatchGroup = DispatchGroup()
+        var movies: [Title] = []
+        var tvShows: [Title] = []
+        var fetchError: Error?
+        
+        // Fetch recent movies
+        dispatchGroup.enter()
+        let movieRequest = createRequest(with: url)
+        executeRequest(request: movieRequest) { (result: Result<TrendingTitleResponse, Error>) in
+            switch result {
+            case .success(let response):
+                // Mark each title as a movie
+                movies = response.results.map { title in
+                    var mutableTitle = title
+                    mutableTitle.mediaType = "movie"
+                    return mutableTitle
+                }
+            case .failure(let error):
+                fetchError = error
+            }
+            dispatchGroup.leave()
+        }
+        
+        // Fetch recent TV shows
+        dispatchGroup.enter()
+        let tvURL = "\(Configuration.URLs.TMDB_BASE_URL)/discover/tv?include_adult=false&include_null_first_air_dates=false&language=en-US&page=1&air_date.gte=\(fromDate)&air_date.lte=\(toDate)&sort_by=first_air_date.desc"
+        
+        guard let tvUrl = URL(string: tvURL) else {
+            dispatchGroup.leave()
+            if fetchError == nil {
+                fetchError = APIError.invalidURL
+            }
+            return
+        }
+        
+        let tvRequest = createRequest(with: tvUrl)
+        executeRequest(request: tvRequest) { (result: Result<TrendingTitleResponse, Error>) in
+            switch result {
+            case .success(let response):
+                // Mark each title as TV
+                tvShows = response.results.map { title in
+                    var mutableTitle = title
+                    mutableTitle.mediaType = "tv"
+                    return mutableTitle
+                }
+            case .failure(let error):
+                if fetchError == nil {
+                    fetchError = error
+                }
+            }
+            dispatchGroup.leave()
+        }
+        
+        // Combine and sort results when both API calls complete
+        dispatchGroup.notify(queue: .main) {
+            if let error = fetchError {
+                completion(.failure(error))
+                return
+            }
+            
+            // Combine movies and TV shows
+            let allTitles = movies + tvShows
+            
+            // Sort by release date, newest first
+            let sortedTitles = allTitles.sorted { (title1, title2) -> Bool in
+                let date1String = title1.releaseDate ?? title1.firstAirDate ?? ""
+                let date2String = title2.releaseDate ?? title2.firstAirDate ?? ""
+                
+                if let date1 = DateFormatter.yearFormatter.date(from: date1String),
+                   let date2 = DateFormatter.yearFormatter.date(from: date2String) {
+                    return date1 > date2 // Descending order (newest first)
+                }
+                return false
+            }
+            
+            completion(.success(sortedTitles))
+        }
+    }
+    
+    // Update the getUPComingMovies method to sort by nearest release date
+    func getUpcomingMoviesSorted(completion: @escaping (Result<[Title], Error>) -> Void) {
+        getUPComingMovies { result in
+            switch result {
+            case .success(let titles):
+                // Get today's date
+                let today = Date()
+                
+                // Filter for future releases
+                let futureReleases = titles.filter { title in
+                    if let dateString = title.releaseDate,
+                       let releaseDate = DateFormatter.yearFormatter.date(from: dateString) {
+                        return releaseDate >= today
+                    }
+                    return false
+                }
+                
+                // Sort by release date (closest first)
+                let sortedTitles = futureReleases.sorted { (title1, title2) -> Bool in
+                    let date1String = title1.releaseDate ?? ""
+                    let date2String = title2.releaseDate ?? ""
+                    
+                    if let date1 = DateFormatter.yearFormatter.date(from: date1String),
+                       let date2 = DateFormatter.yearFormatter.date(from: date2String) {
+                        return date1 < date2 // Ascending order (closest first)
+                    }
+                    return false
+                }
+                
+                completion(.success(sortedTitles))
+                
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
+    }
+}
+
+// Extension to APICaller for top-rated content improvements
+extension APICaller {
+    // Get top-rated content with higher vote threshold
+    func getHighlyRatedContent(completion: @escaping (Result<[Title], Error>) -> Void) {
+        getTopRatedMovies { result in
+            switch result {
+            case .success(let titles):
+                // Filter for truly outstanding titles (8.5+ rating)
+                let highlyRated = titles.filter { $0.voteAverage ?? 0.0 >= 8.5 }
+                completion(.success(highlyRated))
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
+    }
+}
