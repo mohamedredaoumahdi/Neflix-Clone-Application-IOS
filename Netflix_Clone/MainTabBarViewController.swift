@@ -2,7 +2,7 @@
 // Netflix_Clone
 //
 // Created by mohamed reda oumahdi on 27/02/2024.
-// Updated on 28/03/2025.
+// Updated to fix subscript errors
 //
 
 import UIKit
@@ -122,10 +122,13 @@ class MainTabBarViewController: UITabBarController {
     
     override func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
         // Get the index of the selected tab
-        guard let index = tabBar.items?.firstIndex(of: item),
-              let tabView = tabBar.subviews[safe: index + 1] else {
-            return
-        }
+        guard let index = tabBar.items?.firstIndex(of: item) else { return }
+        
+        // Make sure the index is valid
+        guard index + 1 < tabBar.subviews.count else { return }
+        
+        // Find the tab view
+        let tabView = tabBar.subviews[index + 1]
         
         // Find the icon view inside the tab view
         let iconView = tabView.subviews.first { $0 is UIImageView }
@@ -144,10 +147,3 @@ class MainTabBarViewController: UITabBarController {
     }
 }
 
-// MARK: - Safe Array Extension
-
-extension Array {
-    subscript(safe index: Int) -> Element? {
-        return indices.contains(index) ? self[index] : nil
-    }
-}

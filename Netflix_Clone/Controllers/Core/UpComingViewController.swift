@@ -146,6 +146,7 @@ class UpComingViewController: UIViewController {
         // Set loading state
         isLoadingMore = true
         
+        // Use the main APICaller method (not the local extension)
         APICaller.shared.getUPComingMovies(page: page) { [weak self] result in
             guard let self = self else { return }
             
@@ -270,11 +271,15 @@ extension UpComingViewController: UITableViewDelegate, UITableViewDataSource {
             switch result {
             case .success(let viewController):
                 DispatchQueue.main.async {
-                    self?.navigationController?.pushViewController(viewController, animated: true)
+                    if let self = self {
+                        self.navigationController?.pushViewController(viewController, animated: true)
+                    }
                 }
             case .failure(let error):
                 DispatchQueue.main.async {
-                    ErrorPresenter.showError(error, on: self!)
+                    if let self = self {
+                        ErrorPresenter.showError(error, on: self)
+                    }
                 }
             }
         }
@@ -320,7 +325,9 @@ extension UpComingViewController: UITableViewDelegate, UITableViewDataSource {
                             )
                             banner.show()
                         case .failure(let error):
-                            ErrorPresenter.showError(error, on: self!)
+                            if let self = self {
+                                ErrorPresenter.showError(error, on: self)
+                            }
                         }
                     }
                 }
@@ -347,17 +354,16 @@ extension UpComingViewController: UITableViewDelegate, UITableViewDataSource {
     }
 }
 
-// MARK: - Extended APICaller Method
-
-extension APICaller {
-    // Get upcoming movies with pagination
-    func getUPComingMovies(page: Int = 1, completion: @escaping (Result<TrendingTitleResponse, Error>) -> Void) {
-        guard let url = URL(string: "\(Configuration.URLs.TMDB_BASE_URL)/movie/upcoming?language=en-US&page=\(page)") else {
-            completion(.failure(APIError.invalidURL))
-            return
-        }
-        
-        let request = createRequest(with: url)
-        executeRequest(request: request, completion: completion)
-    }
-}
+/* REMOVE THIS EXTENSION - Now using the centralized method in APICaller.swift */
+// extension APICaller {
+//     // Get upcoming movies with pagination
+//     func getUPComingMovies(page: Int = 1, completion: @escaping (Result<TrendingTitleResponse, Error>) -> Void) {
+//         guard let url = URL(string: "\(Configuration.URLs.TMDB_BASE_URL)/movie/upcoming?language=en-US&page=\(page)") else {
+//             completion(.failure(APIError.invalidURL))
+//             return
+//         }
+//
+//         let request = createRequest(with: url)
+//         executeRequest(request: request, completion: completion)
+//     }
+// }

@@ -43,6 +43,15 @@ class TitleCollectionViewCell: UICollectionViewCell {
         return indicator
     }()
     
+    private let errorImageView: UIImageView = {
+        let imageView = UIImageView(image: UIImage(systemName: "exclamationmark.triangle"))
+        imageView.contentMode = .scaleAspectFit
+        imageView.tintColor = .systemOrange
+        imageView.isHidden = true
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+    
     // MARK: - Initialization
     
     override init(frame: CGRect) {
@@ -64,6 +73,7 @@ class TitleCollectionViewCell: UICollectionViewCell {
         super.prepareForReuse()
         posterImageView.image = nil
         loadingIndicator.stopAnimating()
+        errorImageView.isHidden = true
     }
     
     // MARK: - Setup Methods
@@ -72,6 +82,7 @@ class TitleCollectionViewCell: UICollectionViewCell {
         contentView.addSubview(posterImageView)
         posterImageView.layer.addSublayer(gradientOverlay)
         contentView.addSubview(loadingIndicator)
+        contentView.addSubview(errorImageView)
         
         // Add subtle shadow
         contentView.layer.shadowColor = UIColor.black.cgColor
@@ -82,54 +93,89 @@ class TitleCollectionViewCell: UICollectionViewCell {
         // Center loading indicator
         NSLayoutConstraint.activate([
             loadingIndicator.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            loadingIndicator.centerYAnchor.constraint(equalTo: contentView.centerYAnchor)
+            loadingIndicator.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            
+            // Center error icon
+            errorImageView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            errorImageView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            errorImageView.widthAnchor.constraint(equalToConstant: 40),
+            errorImageView.heightAnchor.constraint(equalToConstant: 40)
         ])
     }
     
     // MARK: - Configuration
     
     public func configure(with model: String) {
+        // Reset the cell first
+        posterImageView.image = nil
+        errorImageView.isHidden = true
         loadingIndicator.startAnimating()
             
         guard !model.isEmpty else {
             print("Empty poster path")
-            posterImageView.image = UIImage(systemName: "film")
-            loadingIndicator.stopAnimating() // Add this line
-            return
-        }
-        // Construct image URL
-        let imageURL = "\(Configuration.URLs.TMDB_IMAGE_URL)/\(model)"
-        print("Full image URL: \(imageURL)")
-        guard let url = URL(string: imageURL) else {
-            print("Invalid image URL: \(imageURL)")
-            posterImageView.image = UIImage(systemName: "film")
-            loadingIndicator.stopAnimating()
+            showErrorState(message: "No image")
             return
         }
         
-        // Load image with SDWebImage
-        posterImageView.sd_setImage(with: url, placeholderImage: nil, options: [], completed: { [weak self] (image, error, _, _) in
-            // Stop loading indicator when image is loaded or on error
-            self?.loadingIndicator.stopAnimating()
-            
-            if let error = error {
-                print("Image loading error: \(error.localizedDescription)")
-                self?.posterImageView.image = UIImage(systemName: "film")
-                return
+        // First check if the path already includes the base URL
+        let imageURL: String
+        if model.starts(with: "http") {
+            imageURL = model
+        } else {
+            // If it doesn't start with http, assume it's a poster path that needs the base URL
+            imageURL = "\(Configuration.URLs.TMDB_IMAGE_URL)/\(model)"
+        }
+        
+        print("Full image URL: \(imageURL)")
+        guard let url = URL(string: imageURL) else {
+            print("Invalid image URL: \(imageURL)")
+            showErrorState(message: "Invalid URL")
+            return
+        }
+        
+        // Load image with SDWebImage with proper error handling
+        posterImageView.sd_setImage(
+            with: url,
+            placeholderImage: UIImage(systemName: "film"),
+            options: [.retryFailed, .handleCookies],
+            context: nil,
+            progress: nil,
+            completed: { [weak self] (image, error, cacheType, imageURL) in
+                // Stop loading indicator when image is loaded or on error
+                self?.loadingIndicator.stopAnimating()
+                
+                if let error = error {
+                    print("Image loading error: \(error.localizedDescription)")
+                    self?.showErrorState(message: "Failed to load image")
+                    return
+                }
+                
+                if image != nil {
+                    print("Image loaded successfully")
+                    
+                    // Apply fade-in animation for smoother appearance
+                    self?.posterImageView.alpha = 0.0
+                    UIView.animate(withDuration: 0.3) {
+                        self?.posterImageView.alpha = 1.0
+                    }
+                } else {
+                    print("Image is nil after loading")
+                    self?.showErrorState(message: "No image data")
+                }
             }
-            
-            if image != nil {
-                print("Image loaded successfully")
-            } else {
-                print("Image is nil after loading")
-            }
-            
-            // Add subtle animation when image appears
-            self?.posterImageView.alpha = 0.0
-            UIView.animate(withDuration: 0.3) {
-                self?.posterImageView.alpha = 1.0
-            }
-        })
+        )
+    }
+    
+    private func showErrorState(message: String) {
+        loadingIndicator.stopAnimating()
+        posterImageView.image = UIImage(systemName: "film")
+        posterImageView.contentMode = .scaleAspectFit
+        posterImageView.tintColor = .systemGray3
+        
+        errorImageView.isHidden = false
+        
+        // Log error for debugging
+        print("Image error: \(message)")
     }
     
     // Apply a frosted effect to highlight cell selection

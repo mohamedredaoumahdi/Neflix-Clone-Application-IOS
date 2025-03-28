@@ -12,12 +12,25 @@ class LoadingView {
     private var activityIndicator: UIActivityIndicatorView?
     private var loadingContainer: UIView?
     private var backgroundView: UIView?
+    private var loadingCount = 0
+    private var textLabel: UILabel?
     
     private init() {}
     
     func showLoading(in view: UIView, withText text: String? = nil) {
         DispatchQueue.main.async { [weak self] in
-            self?.hideLoading()
+            guard let self = self else { return }
+            
+            // Increment loading counter
+            self.loadingCount += 1
+            
+            // If already showing, just update text if needed
+            if self.backgroundView?.superview != nil {
+                if let text = text, let textLabel = self.textLabel {
+                    textLabel.text = text
+                }
+                return
+            }
             
             // Create a background view that covers the entire screen
             let backgroundView = UIView(frame: view.bounds)
@@ -54,6 +67,7 @@ class LoadingView {
                 label.textAlignment = .center
                 label.translatesAutoresizingMaskIntoConstraints = false
                 containerView.addSubview(label)
+                self.textLabel = label
                 
                 NSLayoutConstraint.activate([
                     containerView.centerXAnchor.constraint(equalTo: backgroundView.centerXAnchor),
@@ -84,27 +98,62 @@ class LoadingView {
             
             indicator.startAnimating()
             
-            self?.activityIndicator = indicator
-            self?.loadingContainer = containerView
-            self?.backgroundView = backgroundView
+            self.activityIndicator = indicator
+            self.loadingContainer = containerView
+            self.backgroundView = backgroundView
+            
+            // Add tap gesture to prevent interaction with background
+            let tapGesture = UITapGestureRecognizer(target: nil, action: nil)
+            tapGesture.cancelsTouchesInView = false
+            backgroundView.addGestureRecognizer(tapGesture)
         }
     }
     
     func hideLoading() {
         DispatchQueue.main.async { [weak self] in
-            self?.activityIndicator?.stopAnimating()
+            guard let self = self else { return }
             
-            UIView.animate(withDuration: 0.2, animations: {
-                self?.backgroundView?.alpha = 0
-            }, completion: { _ in
-                self?.activityIndicator?.removeFromSuperview()
-                self?.loadingContainer?.removeFromSuperview()
-                self?.backgroundView?.removeFromSuperview()
+            // Decrement counter
+            self.loadingCount -= 1
+            
+            // Only hide if counter is 0 or negative (safety)
+            if self.loadingCount <= 0 {
+                self.loadingCount = 0  // Reset to 0 if negative
                 
-                self?.activityIndicator = nil
-                self?.loadingContainer = nil
-                self?.backgroundView = nil
-            })
+                self.activityIndicator?.stopAnimating()
+                
+                UIView.animate(withDuration: 0.2, animations: {
+                    self.backgroundView?.alpha = 0
+                }, completion: { _ in
+                    self.activityIndicator?.removeFromSuperview()
+                    self.loadingContainer?.removeFromSuperview()
+                    self.backgroundView?.removeFromSuperview()
+                    self.textLabel = nil
+                    
+                    self.activityIndicator = nil
+                    self.loadingContainer = nil
+                    self.backgroundView = nil
+                })
+            }
+        }
+    }
+    
+    // Force hide all loading indicators (useful for error cases)
+    func forceHideAllLoading() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            // Reset counter
+            self.loadingCount = 0
+            
+            self.activityIndicator?.stopAnimating()
+            self.backgroundView?.removeFromSuperview()
+            self.loadingContainer?.removeFromSuperview()
+            self.textLabel = nil
+            
+            self.activityIndicator = nil
+            self.loadingContainer = nil
+            self.backgroundView = nil
         }
     }
 }

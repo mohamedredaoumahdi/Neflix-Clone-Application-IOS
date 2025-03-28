@@ -7,12 +7,28 @@
 
 import UIKit
 
+// Fixed delegate protocol with clearer method names
 protocol ColletionViewTableViewCellDelegate: AnyObject {
-    // Legacy method (for backward compatibility)
-    func colletionViewTableViewCellDidTapCell(_ cell: CollectionTableViewCell, viewModel: TitlePreviewViewModel)
+    // Renamed for clarity and to avoid ambiguity
+    func collectionViewDidTapCellWithViewModel(_ cell: CollectionTableViewCell, viewModel: TitlePreviewViewModel)
+    func collectionViewDidTapCellWithTitle(_ cell: CollectionTableViewCell, title: Title)
+}
+
+// For backward compatibility, provide default implementations
+extension ColletionViewTableViewCellDelegate {
+    // Default implementation for legacy support
+    func colletionViewTableViewCellDidTapCell(_ cell: CollectionTableViewCell, viewModel: TitlePreviewViewModel) {
+        collectionViewDidTapCellWithViewModel(cell, viewModel: viewModel)
+    }
     
-    // New method that passes the title for detailed loading
-    func colletionViewTableViewCellDidTapCell(_ cell: CollectionTableViewCell, title: Title)
+    // Default implementation for legacy support
+    func colletionViewTableViewCellDidTapCell(_ cell: CollectionTableViewCell, title: Title) {
+        collectionViewDidTapCellWithTitle(cell, title: title)
+    }
+    
+    // Default implementations if not implemented by conforming types
+    func collectionViewDidTapCellWithViewModel(_ cell: CollectionTableViewCell, viewModel: TitlePreviewViewModel) {}
+    func collectionViewDidTapCellWithTitle(_ cell: CollectionTableViewCell, title: Title) {}
 }
 
 class CollectionTableViewCell: UITableViewCell {
@@ -168,25 +184,29 @@ class CollectionTableViewCell: UITableViewCell {
     
     func showSkeletonLoading() {
         DispatchQueue.main.async { [weak self] in
-            self?.collectionView.isHidden = true
-            self?.errorView.isHidden = true
+            guard let self = self else { return }
+            
+            self.collectionView.isHidden = true
+            self.errorView.isHidden = true
             
             // Show and animate skeleton views
-            for view in self?.skeletonCells ?? [] {
+            for view in self.skeletonCells {
                 view.isHidden = false
                 
                 // Add shimmer effect
-                self?.addShimmerEffect(to: view)
+                self.addShimmerEffect(to: view)
             }
         }
     }
     
     func hideSkeletonLoading() {
         DispatchQueue.main.async { [weak self] in
-            self?.collectionView.isHidden = false
+            guard let self = self else { return }
+            
+            self.collectionView.isHidden = false
             
             // Hide skeleton views and remove animations
-            for view in self?.skeletonCells ?? [] {
+            for view in self.skeletonCells {
                 view.isHidden = true
                 view.layer.removeAllAnimations()
             }
@@ -195,12 +215,14 @@ class CollectionTableViewCell: UITableViewCell {
     
     func showError(message: String) {
         DispatchQueue.main.async { [weak self] in
-            self?.collectionView.isHidden = true
-            self?.errorView.isHidden = false
-            self?.errorLabel.text = message
+            guard let self = self else { return }
+            
+            self.collectionView.isHidden = true
+            self.errorView.isHidden = false
+            self.errorLabel.text = message
             
             // Hide skeleton views
-            for view in self?.skeletonCells ?? [] {
+            for view in self.skeletonCells {
                 view.isHidden = true
                 view.layer.removeAllAnimations()
             }
@@ -210,8 +232,12 @@ class CollectionTableViewCell: UITableViewCell {
     // MARK: - Helper Methods
     
     private func addShimmerEffect(to view: UIView) {
+        // Remove any existing shimmer effects
+        view.layer.sublayers?.filter { $0.name == "shimmerLayer" }.forEach { $0.removeFromSuperlayer() }
+        
         // Create shimmer animation
         let gradient = CAGradientLayer()
+        gradient.name = "shimmerLayer"
         gradient.frame = view.bounds
         gradient.colors = [
             UIColor.systemGray5.cgColor,
@@ -253,15 +279,21 @@ extension CollectionTableViewCell: UICollectionViewDelegate, UICollectionViewDat
             return UICollectionViewCell()
         }
         
-        let title = titles[indexPath.row]
-        print("Title at index \(indexPath.row): \(title.originalTitle ?? "unknown")")
-        print("Properties: posterPath=\(title.posterPath ?? "nil"), mediaType=\(title.mediaType ?? "nil")")
-        
-        if let posterPath = title.posterPath {
-            cell.configure(with: posterPath)
+        // Bounds check to prevent crashes
+        if indexPath.row < titles.count {
+            let title = titles[indexPath.row]
+            print("Title at index \(indexPath.row): \(title.originalTitle ?? "unknown")")
+            print("Properties: posterPath=\(title.posterPath ?? "nil"), mediaType=\(title.mediaType ?? "nil")")
+            
+            if let posterPath = title.posterPath {
+                cell.configure(with: posterPath)
+            } else {
+                cell.posterImageView.image = UIImage(systemName: "film")
+                print("No poster path for title at index \(indexPath.row)")
+            }
         } else {
-            cell.posterImageView.image = UIImage(systemName: "film")
-            print("No poster path for title at index \(indexPath.row)")
+            print("Index out of bounds: \(indexPath.row) for titles count: \(titles.count)")
+            cell.posterImageView.image = UIImage(systemName: "exclamationmark.triangle")
         }
         
         return cell
@@ -270,13 +302,23 @@ extension CollectionTableViewCell: UICollectionViewDelegate, UICollectionViewDat
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         collectionView.deselectItem(at: indexPath, animated: true)
         
+        // Bounds check to prevent crashes
+        guard indexPath.row < titles.count else {
+            print("Tried to select out-of-bounds index: \(indexPath.row)")
+            return
+        }
+        
         let title = titles[indexPath.row]
         
-        // Use the new delegate method that passes the title directly
-        delegate?.colletionViewTableViewCellDidTapCell(self, title: title)
+        // Use the new delegate method naming
+        delegate?.collectionViewDidTapCellWithTitle(self, title: title)
     }
     
     func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
+        // Bounds check to prevent crashes
+        guard indexPath.row < titles.count else {
+            return nil
+        }
         
         let config = UIContextMenuConfiguration(
             identifier: nil,
@@ -284,7 +326,8 @@ extension CollectionTableViewCell: UICollectionViewDelegate, UICollectionViewDat
                 // Create a preview view controller
                 let previewVC = TitlePreviewViewController()
                 
-                if let title = self?.titles[indexPath.row],
+                if let self = self, indexPath.row < self.titles.count,
+                   let title = self.titles[safe: indexPath.row],
                    let titleName = title.originalTitle ?? title.originalName,
                    let overview = title.overview {
                     
@@ -303,14 +346,22 @@ extension CollectionTableViewCell: UICollectionViewDelegate, UICollectionViewDat
                 return previewVC
             },
             actionProvider: { [weak self] _ in
+                guard let self = self, indexPath.row < self.titles.count else {
+                    return nil
+                }
+                
                 let saveAction = UIAction(
                     title: "Add to My List",
                     image: UIImage(systemName: "plus"),
                     identifier: nil
                 ) { _ in
                     // Implementation for adding to watchlist
-                    // This would be implemented in Phase 5
-                    print("Added to watchlist: \(self?.titles[indexPath.row].originalTitle ?? "Unknown")")
+                    if let title = self.titles[safe: indexPath.row] {
+                        WatchlistManager.shared.addToWatchlist(title: title) { _ in
+                            // Implementation could be enhanced with success/failure handling
+                        }
+                        print("Added to watchlist: \(title.originalTitle ?? "Unknown")")
+                    }
                 }
                 
                 let shareAction = UIAction(
@@ -319,7 +370,7 @@ extension CollectionTableViewCell: UICollectionViewDelegate, UICollectionViewDat
                     identifier: nil
                 ) { _ in
                     // Share functionality
-                    if let title = self?.titles[indexPath.row] {
+                    if let title = self.titles[safe: indexPath.row] {
                         let titleName = title.originalTitle ?? title.originalName ?? "Movie"
                         let activityVC = UIActivityViewController(
                             activityItems: ["Check out '\(titleName)' on Netflix Clone!"],
@@ -340,3 +391,4 @@ extension CollectionTableViewCell: UICollectionViewDelegate, UICollectionViewDat
         return config
     }
 }
+

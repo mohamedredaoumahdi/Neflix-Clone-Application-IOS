@@ -117,15 +117,17 @@ class HomeViewController: UIViewController {
         APICaller.shared.getTrendingMovies { [weak self] result in
             // Always handle UI updates on the main thread
             DispatchQueue.main.async {
+                guard let self = self else { return }
+                
                 switch result {
                 case .success(let titles):
                     // Hide loading indicator
                     LoadingView.shared.hideLoading()
-                    self?.refreshControl.endRefreshing()  // Now on main thread
+                    self.refreshControl.endRefreshing()
                     
                     // Set random trending movie for header
                     if let selectedTitle = titles.randomElement() {
-                        self?.randomTrendingMovie = selectedTitle
+                        self.randomTrendingMovie = selectedTitle
                         
                         // Create detailed view model for header
                         let viewModel = TitleViewModel(
@@ -134,15 +136,19 @@ class HomeViewController: UIViewController {
                         )
                         
                         // Already on main thread
-                        self?.headerView?.configure(with: viewModel)
+                        self.headerView?.configure(with: viewModel)
                     }
                     
                 case .failure(let error):
                     // Hide loading and show error
                     LoadingView.shared.hideLoading()
-                    self?.refreshControl.endRefreshing()  // Now on main thread
+                    self.refreshControl.endRefreshing()
                     
-                    ErrorPresenter.showError(error, on: self!)
+                    if let appError = error as? AppError {
+                        ErrorPresenter.showError(appError, on: self)
+                    } else {
+                        ErrorPresenter.showError(AppError.apiError(error.localizedDescription), on: self)
+                    }
                 }
             }
         }
@@ -216,7 +222,23 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
                 
             case .failure(let error):
                 cell.hideSkeletonLoading()
-                cell.showError(message: error.localizedDescription)
+                // Convert to user-friendly error message
+                let errorMessage: String
+                if let apiError = error as? APIError {
+                    switch apiError {
+                    case .failedToGetData:
+                        errorMessage = "Couldn't load content. Please try again."
+                    case .invalidURL:
+                        errorMessage = "Invalid URL. Please report this issue."
+                    case .noDataReturned:
+                        errorMessage = "No data received from server."
+                    case .decodingError:
+                        errorMessage = "Error processing the data."
+                    }
+                } else {
+                    errorMessage = "Something went wrong. Try refreshing."
+                }
+                cell.showError(message: errorMessage)
                 print("Error: \(error.localizedDescription)")
             }
         }
@@ -262,18 +284,30 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
 
 // MARK: - ColletionViewTableViewCellDelegate
 
-// Update the ColletionViewTableViewCellDelegate extension in HomeViewController
-
+// Update to match the new delegate methods in CollectionTableViewCell
 extension HomeViewController: ColletionViewTableViewCellDelegate {
+    // Legacy method for backward compatibility
     func colletionViewTableViewCellDidTapCell(_ cell: CollectionTableViewCell, viewModel: TitlePreviewViewModel) {
         DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
             let vc = TitlePreviewViewController()
             vc.configure(with: viewModel)
-            self?.navigationController?.pushViewController(vc, animated: true)
+            self.navigationController?.pushViewController(vc, animated: true)
         }
     }
     
-    func colletionViewTableViewCellDidTapCell(_ cell: CollectionTableViewCell, title: Title) {
+    // New method using the updated naming
+    func collectionViewDidTapCellWithViewModel(_ cell: CollectionTableViewCell, viewModel: TitlePreviewViewModel) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            let vc = TitlePreviewViewController()
+            vc.configure(with: viewModel)
+            self.navigationController?.pushViewController(vc, animated: true)
+        }
+    }
+    
+    // Updated method for handling title selection
+    func collectionViewDidTapCellWithTitle(_ cell: CollectionTableViewCell, title: Title) {
         // Show loading indicator
         LoadingView.shared.showLoading(in: view, withText: "Loading details...")
         
@@ -287,13 +321,20 @@ extension HomeViewController: ColletionViewTableViewCellDelegate {
             switch result {
             case .success(let viewController):
                 DispatchQueue.main.async {
-                    self?.navigationController?.pushViewController(viewController, animated: true)
+                    guard let self = self else { return }
+                    self.navigationController?.pushViewController(viewController, animated: true)
                 }
             case .failure(let error):
                 DispatchQueue.main.async {
-                    ErrorPresenter.showError(error, on: self!)
+                    guard let self = self else { return }
+                    ErrorPresenter.showError(error, on: self)
                 }
             }
         }
+    }
+    
+    // Legacy method for backward compatibility
+    func colletionViewTableViewCellDidTapCell(_ cell: CollectionTableViewCell, title: Title) {
+        collectionViewDidTapCellWithTitle(cell, title: title)
     }
 }

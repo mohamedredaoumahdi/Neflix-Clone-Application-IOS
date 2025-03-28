@@ -46,6 +46,27 @@ struct MovieDetail: Codable {
         }
         return DateFormatter.yearOnlyFormatter.string(from: date)
     }
+    
+    // IMPORTANT: Add explicit CodingKeys for correct mapping
+    enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case overview
+        case backdropPath = "backdrop_path"
+        case posterPath = "poster_path"
+        case genres
+        case releaseDate = "release_date"
+        case runtime
+        case voteAverage = "vote_average"
+        case voteCount = "vote_count"
+        case status
+        case tagline
+        case budget
+        case revenue
+        case credits
+        case videos
+        case similar
+    }
 }
 
 struct Genre: Codable {
@@ -64,6 +85,14 @@ struct Cast: Codable {
     let character: String?
     let profilePath: String?
     let order: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case character
+        case profilePath = "profile_path"
+        case order
+    }
 }
 
 struct Crew: Codable {
@@ -72,6 +101,14 @@ struct Crew: Codable {
     let job: String
     let department: String
     let profilePath: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case job
+        case department
+        case profilePath = "profile_path"
+    }
 }
 
 struct VideoResponse: Codable {
@@ -96,26 +133,11 @@ struct SimilarMoviesResponse: Codable {
     let page: Int
     let totalPages: Int
     let totalResults: Int
-}
-
-// MARK: - Date Formatter Extensions
-
-extension DateFormatter {
-    static let yearFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
     
-    static let yearOnlyFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy"
-        return formatter
-    }()
-    
-    static let readableDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMMM d, yyyy"
-        return formatter
-    }()
+    enum CodingKeys: String, CodingKey {
+        case results
+        case page
+        case totalPages = "total_pages"
+        case totalResults = "total_results"
+    }
 }

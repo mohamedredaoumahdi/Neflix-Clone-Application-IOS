@@ -162,7 +162,12 @@ class ContentCalendarViewController: UIViewController {
         APICaller.shared.getUPComingMovies { result in
             switch result {
             case .success(let titles):
-                movies = titles
+                // Mark each title as a movie
+                movies = titles.map { title in
+                    var mutableTitle = title
+                    mutableTitle.mediaType = "movie"
+                    return mutableTitle
+                }
             case .failure(let error):
                 fetchError = error
             }
@@ -185,6 +190,10 @@ class ContentCalendarViewController: UIViewController {
                         return date > currentDate
                     }
                     return false
+                }.map { title in
+                    var mutableTitle = title
+                    mutableTitle.mediaType = "tv"
+                    return mutableTitle
                 }
             case .failure(let error):
                 if fetchError == nil {
@@ -196,24 +205,30 @@ class ContentCalendarViewController: UIViewController {
         
         // Process results when both calls complete
         dispatchGroup.notify(queue: .main) { [weak self] in
+            guard let self = self else { return }
+            
             // Hide loading indicators
             LoadingView.shared.hideLoading()
-            self?.refreshControl.endRefreshing()
+            self.refreshControl.endRefreshing()
             
             if let error = fetchError {
-                ErrorPresenter.showError(error, on: self!)
+                if let appError = error as? AppError {
+                    ErrorPresenter.showError(appError, on: self)
+                } else {
+                    ErrorPresenter.showError(AppError.apiError(error.localizedDescription), on: self)
+                }
                 return
             }
             
             // Store all upcoming titles
-            self?.upcomingTitles = (movies + tvShows).sorted(by: {
+            self.upcomingTitles = (movies + tvShows).sorted(by: {
                 let date1 = DateFormatter.yearFormatter.date(from: $0.releaseDate ?? $0.firstAirDate ?? "") ?? Date.distantFuture
                 let date2 = DateFormatter.yearFormatter.date(from: $1.releaseDate ?? $1.firstAirDate ?? "") ?? Date.distantFuture
                 return date1 < date2
             })
             
             // Apply current filter
-            self?.applyFilter()
+            self.applyFilter()
         }
     }
     
@@ -232,8 +247,7 @@ class ContentCalendarViewController: UIViewController {
         groupedTitles = Dictionary(grouping: filteredTitles) { title in
             let dateString = title.releaseDate ?? title.firstAirDate ?? ""
             if let date = DateFormatter.yearFormatter.date(from: dateString) {
-                let monthFormatter = DateFormatter()
-                monthFormatter.dateFormat = "MMMM yyyy"
+                let monthFormatter = DateFormatter.monthYearFormatter
                 return monthFormatter.string(from: date)
             }
             return "Unknown Date"
@@ -241,8 +255,7 @@ class ContentCalendarViewController: UIViewController {
         
         // Sort months chronologically
         sortedMonths = groupedTitles.keys.sorted { month1, month2 in
-            let monthFormatter = DateFormatter()
-            monthFormatter.dateFormat = "MMMM yyyy"
+            let monthFormatter = DateFormatter.monthYearFormatter
             
             let date1 = monthFormatter.date(from: month1) ?? Date.distantFuture
             let date2 = monthFormatter.date(from: month2) ?? Date.distantFuture
@@ -279,13 +292,13 @@ class ContentCalendarViewController: UIViewController {
         applyFilter()
     }
     
-    @objc private func refreshData() {
+    @objc func refreshData() {
         fetchUpcomingContent()
     }
     
     // MARK: - Helper Methods
     
-    private func setReminder(for title: Title) {
+    func setReminder(for title: Title) {
         // Get release date
         guard let dateString = title.releaseDate ?? title.firstAirDate,
               let releaseDate = DateFormatter.yearFormatter.date(from: dateString) else {
@@ -302,50 +315,90 @@ class ContentCalendarViewController: UIViewController {
         // Create calendar event with proper permission handling
         let eventStore = EKEventStore()
         
-        if #available(iOS 17.0, *) {
-            eventStore.requestFullAccessToEvents { [weak self] granted, error in
-                self?.handleCalendarAccess(granted: granted, error: error, eventStore: eventStore, title: title, releaseDate: releaseDate)
-            }
-        } else {
-            eventStore.requestAccess(to: .event) { [weak self] granted, error in
-                self?.handleCalendarAccess(granted: granted, error: error, eventStore: eventStore, title: title, releaseDate: releaseDate)
+        // Check and request calendar access
+        checkCalendarAuthorizationStatus(eventStore: eventStore) { [weak self] granted in
+            guard let self = self else { return }
+            
+            if granted {
+                self.createCalendarEvent(for: title, on: releaseDate, using: eventStore)
+            } else {
+                DispatchQueue.main.async {
+                    self.showCalendarAccessDeniedAlert()
+                }
             }
         }
     }
-
-    private func handleCalendarAccess(granted: Bool, error: Error?, eventStore: EKEventStore, title: Title, releaseDate: Date) {
-        guard granted, error == nil else {
-            DispatchQueue.main.async { [weak self] in
-                guard let self = self else { return }
-                ErrorPresenter.showError(AppError.apiError("Calendar access denied. Please enable in Settings."), on: self)
+    
+    private func checkCalendarAuthorizationStatus(eventStore: EKEventStore, completion: @escaping (Bool) -> Void) {
+        let authStatus = EKEventStore.authorizationStatus(for: .event)
+        
+        switch authStatus {
+        case .authorized:
+            completion(true)
+        case .denied, .restricted:
+            completion(false)
+        case .notDetermined:
+            // Request access
+            if #available(iOS 17.0, *) {
+                eventStore.requestFullAccessToEvents { granted, error in
+                    DispatchQueue.main.async {
+                        completion(granted)
+                    }
+                }
+            } else {
+                eventStore.requestAccess(to: .event) { granted, error in
+                    DispatchQueue.main.async {
+                        completion(granted)
+                    }
+                }
             }
-            return
+        @unknown default:
+            completion(false)
         }
+    }
+    
+    private func showCalendarAccessDeniedAlert() {
+        let alert = UIAlertController(
+            title: "Calendar Access Required",
+            message: "Please enable calendar access in Settings to set reminders for upcoming titles.",
+            preferredStyle: .alert
+        )
         
-        let event = EKEvent(eventStore: eventStore)
-        event.title = "Release: \(title.displayTitle)"
-        event.notes = title.overview
-        event.startDate = releaseDate
-        event.endDate = releaseDate.addingTimeInterval(3600) // 1 hour duration
-        event.calendar = eventStore.defaultCalendarForNewEvents
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Open Settings", style: .default) { _ in
+            if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(settingsURL)
+            }
+        })
         
+        present(alert, animated: true)
+    }
+    
+    private func createCalendarEvent(for title: Title, on releaseDate: Date, using eventStore: EKEventStore) {
         do {
+            // Create the event
+            let event = EKEvent(eventStore: eventStore)
+            event.title = "Release: \(title.displayTitle)"
+            event.notes = title.overview
+            event.startDate = releaseDate
+            event.endDate = releaseDate.addingTimeInterval(3600) // 1 hour duration
+            event.calendar = eventStore.defaultCalendarForNewEvents
+            
+            // Save the event
             try eventStore.save(event, span: .thisEvent)
             
-            DispatchQueue.main.async { [weak self] in
-                guard let self = self else { return }
-                let alert = UIAlertController(
+            // Show success message using our custom NotificationBanner
+            DispatchQueue.main.async {
+                NotificationBanner.showSuccess(
                     title: "Reminder Set",
-                    message: "A reminder has been added to your calendar for the release of '\(title.displayTitle)'",
-                    preferredStyle: .alert
+                    subtitle: "A reminder has been added to your calendar for the release of '\(title.displayTitle)'"
                 )
-                alert.addAction(UIAlertAction(title: "OK", style: .default))
-                self.present(alert, animated: true)
             }
         } catch {
+            // Show error message
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
-                ErrorPresenter.showError(AppError.apiError("Failed to create reminder"), on: self)
+                ErrorPresenter.showError(AppError.apiError("Failed to create reminder: \(error.localizedDescription)"), on: self)
             }
         }
     }
@@ -407,14 +460,19 @@ extension ContentCalendarViewController: UITableViewDelegate, UITableViewDataSou
             DispatchQueue.main.async {
                 LoadingView.shared.hideLoading()
             }
+            
             switch result {
             case .success(let viewController):
                 DispatchQueue.main.async {
-                    self?.navigationController?.pushViewController(viewController, animated: true)
+                    if let self = self {
+                        self.navigationController?.pushViewController(viewController, animated: true)
+                    }
                 }
             case .failure(let error):
                 DispatchQueue.main.async {
-                    ErrorPresenter.showError(error, on: self!)
+                    if let self = self {
+                        ErrorPresenter.showError(error, on: self)
+                    }
                 }
             }
         }
@@ -430,7 +488,9 @@ extension ContentCalendarViewController: UITableViewDelegate, UITableViewDataSou
         
         // Create "Set Reminder" action
         let reminderAction = UIContextualAction(style: .normal, title: "Remind") { [weak self] (_, _, completionHandler) in
-            self?.setReminder(for: title)
+            if let self = self {
+                self.setReminder(for: title)
+            }
             completionHandler(true)
         }
         
@@ -442,28 +502,26 @@ extension ContentCalendarViewController: UITableViewDelegate, UITableViewDataSou
         let watchlistAction = UIContextualAction(style: .normal, title: "Watchlist") { [weak self] (_, _, completionHandler) in
             // Check if already in watchlist
             if WatchlistManager.shared.isTitleInWatchlist(id: title.id) {
-                let alert = UIAlertController(
+                // Show already in watchlist message using our NotificationBanner
+                NotificationBanner.showInfo(
                     title: "Already in Watchlist",
-                    message: "This title is already in your watchlist",
-                    preferredStyle: .alert
+                    subtitle: "This title is already in your watchlist"
                 )
-                alert.addAction(UIAlertAction(title: "OK", style: .default))
-                self?.present(alert, animated: true)
             } else {
                 // Add to watchlist
                 WatchlistManager.shared.addToWatchlist(title: title) { result in
                     DispatchQueue.main.async {
                         switch result {
                         case .success:
-                            // Show success message
-                            let banner = NotificationBanner(
+                            // Show success message using our NotificationBanner
+                            NotificationBanner.showSuccess(
                                 title: "Added to Watchlist",
-                                subtitle: "\(title.displayTitle) has been added to your watchlist.",
-                                style: .success
+                                subtitle: "\(title.displayTitle) has been added to your watchlist."
                             )
-                            banner.show()
                         case .failure(let error):
-                            ErrorPresenter.showError(error, on: self!)
+                            if let self = self {
+                                ErrorPresenter.showError(error, on: self)
+                            }
                         }
                     }
                 }
@@ -487,147 +545,3 @@ extension ContentCalendarViewController: UITableViewDelegate, UITableViewDataSou
         header.textLabel?.textColor = DesignSystem.Colors.primary
     }
 }
-
-// MARK: - EKEvent Support
-
-import EventKit
-
-// MARK: - Simple Banner Notification
-
-class NotificationBanner {
-    enum BannerStyle {
-        case success, error, warning, info
-        
-        var color: UIColor {
-            switch self {
-            case .success: return .systemGreen
-            case .error: return .systemRed
-            case .warning: return .systemYellow
-            case .info: return .systemBlue
-            }
-        }
-        
-        var icon: UIImage? {
-            switch self {
-            case .success: return UIImage(systemName: "checkmark.circle.fill")
-            case .error: return UIImage(systemName: "exclamationmark.circle.fill")
-            case .warning: return UIImage(systemName: "exclamationmark.triangle.fill")
-            case .info: return UIImage(systemName: "info.circle.fill")
-            }
-        }
-    }
-    
-    private let title: String
-    private let subtitle: String?
-    private let style: BannerStyle
-    private let duration: TimeInterval
-    
-    private var bannerView: UIView?
-    
-    init(title: String, subtitle: String? = nil, style: BannerStyle = .info, duration: TimeInterval = 3.0) {
-        self.title = title
-        self.subtitle = subtitle
-        self.style = style
-        self.duration = duration
-    }
-    
-    func show() {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = windowScene.windows.first else {
-            return
-        }
-        
-        // Create banner view
-        let banner = UIView()
-        banner.backgroundColor = style.color
-        banner.layer.cornerRadius = 8
-        banner.clipsToBounds = true
-        banner.translatesAutoresizingMaskIntoConstraints = false
-        banner.layer.shadowColor = UIColor.black.cgColor
-        banner.layer.shadowOffset = CGSize(width: 0, height: 4)
-        banner.layer.shadowOpacity = 0.3
-        banner.layer.shadowRadius = 4
-        
-        // Create title label
-        let titleLabel = UILabel()
-        titleLabel.text = title
-        titleLabel.font = DesignSystem.Typography.subtitle
-        titleLabel.textColor = .white
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        
-        // Create subtitle label if needed
-        let subtitleLabel = UILabel()
-        subtitleLabel.text = subtitle
-        subtitleLabel.font = DesignSystem.Typography.caption
-        subtitleLabel.textColor = .white
-        subtitleLabel.numberOfLines = 2
-        subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
-        
-        // Create icon image view
-        let iconImageView = UIImageView()
-        iconImageView.image = style.icon
-        iconImageView.tintColor = .white
-        iconImageView.contentMode = .scaleAspectFit
-        iconImageView.translatesAutoresizingMaskIntoConstraints = false
-        
-        // Add to banner
-        banner.addSubview(iconImageView)
-        banner.addSubview(titleLabel)
-        if subtitle != nil {
-            banner.addSubview(subtitleLabel)
-        }
-        
-        // Add to window
-        window.addSubview(banner)
-        
-        // Set constraints
-        NSLayoutConstraint.activate([
-            banner.topAnchor.constraint(equalTo: window.safeAreaLayoutGuide.topAnchor, constant: 8),
-            banner.leadingAnchor.constraint(equalTo: window.leadingAnchor, constant: 16),
-            banner.trailingAnchor.constraint(equalTo: window.trailingAnchor, constant: -16),
-            
-            iconImageView.leadingAnchor.constraint(equalTo: banner.leadingAnchor, constant: 16),
-            iconImageView.centerYAnchor.constraint(equalTo: banner.centerYAnchor),
-            iconImageView.widthAnchor.constraint(equalToConstant: 24),
-            iconImageView.heightAnchor.constraint(equalToConstant: 24),
-            
-            titleLabel.leadingAnchor.constraint(equalTo: iconImageView.trailingAnchor, constant: 12),
-            titleLabel.trailingAnchor.constraint(equalTo: banner.trailingAnchor, constant: -16)
-        ])
-        
-        if subtitle != nil {
-            NSLayoutConstraint.activate([
-                titleLabel.topAnchor.constraint(equalTo: banner.topAnchor, constant: 12),
-                subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
-                subtitleLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
-                subtitleLabel.trailingAnchor.constraint(equalTo: titleLabel.trailingAnchor),
-                subtitleLabel.bottomAnchor.constraint(equalTo: banner.bottomAnchor, constant: -12)
-            ])
-        } else {
-            NSLayoutConstraint.activate([
-                titleLabel.topAnchor.constraint(equalTo: banner.topAnchor, constant: 12),
-                titleLabel.bottomAnchor.constraint(equalTo: banner.bottomAnchor, constant: -12)
-            ])
-        }
-        
-        self.bannerView = banner
-        
-        // Animate in
-        banner.transform = CGAffineTransform(translationX: 0, y: -200)
-        UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.5, options: [], animations: {
-            banner.transform = .identity
-        }, completion: { _ in
-            // Animate out after duration
-            DispatchQueue.main.asyncAfter(deadline: .now() + self.duration) {
-                UIView.animate(withDuration: 0.3, animations: {
-                    banner.transform = CGAffineTransform(translationX: 0, y: -200)
-                    banner.alpha = 0
-                }, completion: { _ in
-                    banner.removeFromSuperview()
-                    self.bannerView = nil
-                })
-            }
-        })
-    }
-}
-

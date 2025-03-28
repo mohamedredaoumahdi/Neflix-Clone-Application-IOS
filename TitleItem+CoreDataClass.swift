@@ -2,7 +2,12 @@
 //  TitleItem+CoreDataClass.swift
 //  Netflix_Clone
 //
-//  Created by mohamed reda oumahdi on 27/03/2025.
-//
 
 import Foundation
+import CoreData
+
+// The @objc annotation with the exact name is crucial for Core Data to find the class
+@objc(TitleItem)
+public class TitleItem: NSManagedObject {
+    // This is the base class for your TitleItem entity
+}

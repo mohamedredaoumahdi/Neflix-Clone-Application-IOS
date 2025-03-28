@@ -1,7 +1,8 @@
-// WatchlistManager.swift
-// Netflix_Clone
 //
-// Created by mohamed reda oumahdi on 28/03/2025.
+//  WatchlistManager.swift
+//  Netflix_Clone
+//
+//  Created by mohamed reda oumahdi on 28/03/2025.
 //
 
 import UIKit
@@ -18,14 +19,14 @@ class WatchlistManager {
     
     // MARK: - Properties
     
-    enum WatchlistError: Error {
+    enum WatchlistError: Error, LocalizedError {
         case failedToSave
         case failedToFetch
         case failedToDelete
         case titleAlreadyInWatchlist
         case unknown
         
-        var localizedDescription: String {
+        var errorDescription: String? {
             switch self {
             case .failedToSave:
                 return "Failed to save title to watchlist"
@@ -57,7 +58,9 @@ class WatchlistManager {
         }
         
         let context = appDelegate.persistentContainer.viewContext
-        let watchlistItem = Netflix_Clone.WatchlistItem(context: context)
+        
+        // Create a new WatchlistItem entity object
+        let watchlistItem = NSEntityDescription.insertNewObject(forEntityName: "WatchlistItem", into: context) as! WatchlistItem
         
         // Set properties
         watchlistItem.id = Int64(title.id)
@@ -89,7 +92,9 @@ class WatchlistManager {
         }
         
         let context = appDelegate.persistentContainer.viewContext
-        let fetchRequest: NSFetchRequest<WatchlistItem> = WatchlistItem.fetchRequest()
+        
+        // Create a fetch request with a predicate to find the matching item
+        let fetchRequest = NSFetchRequest<WatchlistItem>(entityName: "WatchlistItem")
         fetchRequest.predicate = NSPredicate(format: "id == %ld", id)
         
         do {
@@ -101,7 +106,7 @@ class WatchlistManager {
                 NotificationCenter.default.post(name: .watchlistUpdated, object: nil)
                 completion(.success(()))
             } else {
-                // Item not found
+                // Item not found - still consider this a success
                 completion(.success(()))
             }
         } catch {
@@ -117,7 +122,9 @@ class WatchlistManager {
         }
         
         let context = appDelegate.persistentContainer.viewContext
-        let fetchRequest: NSFetchRequest<WatchlistItem> = WatchlistItem.fetchRequest()
+        
+        // Create a fetch request with a predicate to count matching items
+        let fetchRequest = NSFetchRequest<WatchlistItem>(entityName: "WatchlistItem")
         fetchRequest.predicate = NSPredicate(format: "id == %ld", id)
         
         do {
@@ -137,7 +144,11 @@ class WatchlistManager {
         }
         
         let context = appDelegate.persistentContainer.viewContext
-        let fetchRequest: NSFetchRequest<WatchlistItem> = WatchlistItem.fetchRequest()
+        
+        // Create a fetch request for all WatchlistItem entities
+        let fetchRequest = NSFetchRequest<WatchlistItem>(entityName: "WatchlistItem")
+        
+        // Add sort by added date (newest first)
         let sortDescriptor = NSSortDescriptor(key: "addedDate", ascending: false)
         fetchRequest.sortDescriptors = [sortDescriptor]
         
@@ -155,8 +166,8 @@ class WatchlistManager {
         return Title(
             id: Int(watchlistItem.id),
             mediaType: watchlistItem.mediaType,
-            originalName: watchlistItem.title,
-            originalTitle: watchlistItem.title,
+            originalName: watchlistItem.mediaType == "tv" ? watchlistItem.title : nil,
+            originalTitle: watchlistItem.mediaType == "movie" ? watchlistItem.title : nil,
             posterPath: watchlistItem.posterPath,
             overview: watchlistItem.overview,
             voteCount: 0,

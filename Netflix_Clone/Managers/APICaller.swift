@@ -35,6 +35,7 @@ class APICaller {
     }
     
     // Helper method for executing requests with proper error handling
+
     private func executeRequest<T: Decodable>(request: URLRequest, completion: @escaping (Result<T, Error>) -> Void) {
         let task = URLSession.shared.dataTask(with: request) { data, response, error in
             // Handle network errors
@@ -58,15 +59,18 @@ class APICaller {
             
             // Debug JSON for complex responses
             #if DEBUG
+            print("Raw JSON structure:")
             if let jsonString = String(data: data, encoding: .utf8) {
-                print("Response first 500 chars: \(String(jsonString.prefix(500)))")
+                print(jsonString.prefix(1000)) // Print first 1000 chars
             }
             #endif
             
             // Decode the response
             do {
                 let decoder = JSONDecoder()
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
+                // REMOVE THIS LINE - it's causing conflicts with explicit CodingKeys
+                // decoder.keyDecodingStrategy = .convertFromSnakeCase
+                
                 let result = try decoder.decode(T.self, from: data)
                 completion(.success(result))
             } catch {
@@ -78,14 +82,12 @@ class APICaller {
         
         task.resume()
     }
-    
     private func formatQueryParameter(param: String) -> String {
         return param.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? param
     }
 
     // MARK: - Movies API Calls
     
-    // In APICaller.swift
     func getTrendingMovies(completion: @escaping (Result<[Title], Error>) -> Void) {
         guard let url = URL(string: "\(Configuration.URLs.TMDB_BASE_URL)/trending/movie/day?language=en-US") else {
             print("Invalid URL for trending movies")
@@ -142,9 +144,8 @@ class APICaller {
         }
     }
     
-    // In APICaller.swift
-    // Extended version with full response
-    func getUPComingMovies(withFullResponse page: Int = 1, completion: @escaping (Result<TrendingTitleResponse, Error>) -> Void) {
+    // CENTRALIZED METHOD: Get upcoming movies with pagination
+    func getUPComingMovies(page: Int = 1, completion: @escaping (Result<TrendingTitleResponse, Error>) -> Void) {
         guard let url = URL(string: "\(Configuration.URLs.TMDB_BASE_URL)/movie/upcoming?language=en-US&page=\(page)") else {
             completion(.failure(APIError.invalidURL))
             return
@@ -152,6 +153,18 @@ class APICaller {
         
         let request = createRequest(with: url)
         executeRequest(request: request, completion: completion)
+    }
+    
+    // Convenience method that returns just the results array
+    func getUPComingMovies(completion: @escaping (Result<[Title], Error>) -> Void) {
+        getUPComingMovies(page: 1) { result in
+            switch result {
+            case .success(let response):
+                completion(.success(response.results))
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
     }
     
     func getTopRatedMovies(completion: @escaping (Result<[Title], Error>) -> Void) {
@@ -250,13 +263,9 @@ class APICaller {
         let request = createRequest(with: url)
         executeRequest(request: request, completion: completion)
     }
-    
-    
 }
 
-
-// Add these methods to your APICaller class to support the Calendar functionality
-
+// MARK: - Calendar API Extensions
 extension APICaller {
     
     // Get upcoming TV shows (released in the future)
@@ -301,8 +310,8 @@ extension APICaller {
         dispatchGroup.enter()
         getUPComingMovies { result in
             switch result {
-            case .success(let titles):
-                movies = titles.map { title in
+            case .success(let response):
+                movies = response.results.map { title in
                     var mutableTitle = title
                     if mutableTitle.mediaType == nil {
                         mutableTitle.mediaType = "movie"
