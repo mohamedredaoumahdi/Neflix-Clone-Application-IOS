@@ -357,6 +357,10 @@ extension APICaller {
                 let date2 = DateFormatter.yearFormatter.date(from: $1.releaseDate ?? $1.firstAirDate ?? "") ?? Date.distantFuture
                 return date1 < date2
             }
+            // In getUpcomingContent completion handler
+            print("Upcoming movies: \(movies.count), TV shows: \(tvShows.count)")
+            print("Sample movie date: \(movies.first?.releaseDate ?? "none")")
+            print("Sample TV date: \(tvShows.first?.firstAirDate ?? "none")")
             
             completion(.success(allTitles))
         }

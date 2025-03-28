@@ -202,6 +202,7 @@ class UpComingViewController: UIViewController {
             // Show calendar view
             calendarContainerView.isHidden = false
             upcomingTable.isHidden = true
+            calendarViewController.refreshData()
         }
     }
     

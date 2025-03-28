@@ -1,13 +1,21 @@
-// ContentCalendarViewController.swift
+// ContentCalendarViewController.swift - Enhanced Debug Version
 // Netflix_Clone
 //
 // Created by mohamed reda oumahdi on 28/03/2025.
-//
+// Updated with display fixes and debugging
 
 import UIKit
 import EventKit
 
 class ContentCalendarViewController: UIViewController {
+    
+    // MARK: - Debug Controls
+    
+    private let debugView = UIView()
+    private let debugStatusLabel = UILabel()
+    private let debugLogTextView = UITextView()
+    private let testDataButton = UIButton(type: .system)
+    private var isDebugMode = true
     
     // MARK: - Properties
     
@@ -54,7 +62,7 @@ class ContentCalendarViewController: UIViewController {
     private let emptyStateLabel: UILabel = {
         let label = UILabel()
         label.text = "No upcoming releases found"
-        label.font = DesignSystem.Typography.subtitle
+        label.font = .systemFont(ofSize: 18, weight: .semibold)
         label.textColor = .systemGray
         label.textAlignment = .center
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -70,16 +78,30 @@ class ContentCalendarViewController: UIViewController {
         
         setupUI()
         setupTableView()
-        fetchUpcomingContent()
+        setupDebugUI()
     }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         
-        // Refresh data if needed
-        if upcomingTitles.isEmpty {
-            fetchUpcomingContent()
+        // Force a data refresh
+        fetchUpcomingContent()
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        
+        // Log the lifecycle and view geometry
+        
+        // Debug UI elements visibility
+        if isDebugMode {
+            debugStatusLabel.text = "DEBUG ACTIVE"
+            debugView.isHidden = true
         }
+    }
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
     }
     
     // MARK: - Setup Methods
@@ -87,7 +109,6 @@ class ContentCalendarViewController: UIViewController {
     private func setupUI() {
         title = "Coming Soon"
         view.backgroundColor = .systemBackground
-        navigationController?.navigationBar.prefersLargeTitles = true
         
         // Add segmented control
         view.addSubview(segmentedControl)
@@ -108,11 +129,11 @@ class ContentCalendarViewController: UIViewController {
             segmentedControl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             segmentedControl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             
-            // Table view
+            // Table view - make sure it's visible and properly sized
             tableView.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: 8),
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            tableView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
             
             // Empty state view
             emptyStateView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
@@ -137,98 +158,170 @@ class ContentCalendarViewController: UIViewController {
         tableView.delegate = self
         tableView.dataSource = self
         
+        // Make sure the table is visible and not hidden
+        tableView.isHidden = false
+        
         // Setup pull to refresh
         refreshControl.addTarget(self, action: #selector(refreshData), for: .valueChanged)
         tableView.refreshControl = refreshControl
     }
     
-    // MARK: - Data Loading
+    private func setupDebugUI() {
+        guard isDebugMode else { return }
+        
+        // Debug container view
+        debugView.backgroundColor = UIColor.black.withAlphaComponent(0.85)
+        debugView.layer.cornerRadius = 10
+        debugView.layer.borderColor = UIColor.red.cgColor
+        debugView.layer.borderWidth = 2
+        debugView.translatesAutoresizingMaskIntoConstraints = false
+        debugView.isHidden = true
+        
+        // Debug status label
+        debugStatusLabel.text = "DEBUG MODE"
+        debugStatusLabel.textColor = .red
+        debugStatusLabel.font = .boldSystemFont(ofSize: 14)
+        debugStatusLabel.textAlignment = .center
+        debugStatusLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Debug log text view
+        debugLogTextView.text = "Debug logs will appear here...\n"
+        debugLogTextView.textColor = .white
+        debugLogTextView.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        debugLogTextView.backgroundColor = .clear
+        debugLogTextView.isEditable = false
+        debugLogTextView.isSelectable = true
+        debugLogTextView.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Test data button
+        testDataButton.setTitle("Load Test Data", for: .normal)
+        testDataButton.backgroundColor = .systemBlue
+        testDataButton.layer.cornerRadius = 5
+        testDataButton.setTitleColor(.white, for: .normal)
+        testDataButton.translatesAutoresizingMaskIntoConstraints = false
+        testDataButton.addTarget(self, action: #selector(loadTestDataTapped), for: .touchUpInside)
+        
+        // Add views to hierarchy
+        debugView.addSubview(debugStatusLabel)
+        debugView.addSubview(debugLogTextView)
+        debugView.addSubview(testDataButton)
+        view.addSubview(debugView)
+        
+        // Set constraints
+        NSLayoutConstraint.activate([
+            debugView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            debugView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            debugView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+            debugView.heightAnchor.constraint(equalToConstant: 200),
+            
+            debugStatusLabel.topAnchor.constraint(equalTo: debugView.topAnchor, constant: 8),
+            debugStatusLabel.leadingAnchor.constraint(equalTo: debugView.leadingAnchor, constant: 8),
+            debugStatusLabel.trailingAnchor.constraint(equalTo: debugView.trailingAnchor, constant: -8),
+            
+            debugLogTextView.topAnchor.constraint(equalTo: debugStatusLabel.bottomAnchor, constant: 8),
+            debugLogTextView.leadingAnchor.constraint(equalTo: debugView.leadingAnchor, constant: 8),
+            debugLogTextView.trailingAnchor.constraint(equalTo: debugView.trailingAnchor, constant: -8),
+            debugLogTextView.bottomAnchor.constraint(equalTo: testDataButton.topAnchor, constant: -8),
+            
+            testDataButton.leadingAnchor.constraint(equalTo: debugView.leadingAnchor, constant: 8),
+            testDataButton.trailingAnchor.constraint(equalTo: debugView.trailingAnchor, constant: -8),
+            testDataButton.bottomAnchor.constraint(equalTo: debugView.bottomAnchor, constant: -8),
+            testDataButton.heightAnchor.constraint(equalToConstant: 40)
+        ])
+    }
     
-    private func fetchUpcomingContent() {
-        // Start loading indicators
-        if !refreshControl.isRefreshing {
-            LoadingView.shared.showLoading(in: view, withText: "Loading upcoming releases...")
-        }
+    // MARK: - Debug Helpers
+    
+    private func debugLog(_ message: String) {
+        guard isDebugMode else { return }
         
-        // Create dispatch group to wait for both movies and TV shows
-        let dispatchGroup = DispatchGroup()
+        // Print to console
+        print("DEBUG: \(message)")
         
-        var movies: [Title] = []
-        var tvShows: [Title] = []
-        var fetchError: Error?
-        
-        // Fetch upcoming movies
-        dispatchGroup.enter()
-        APICaller.shared.getUPComingMovies { result in
-            switch result {
-            case .success(let titles):
-                // Mark each title as a movie
-                movies = titles.map { title in
-                    var mutableTitle = title
-                    mutableTitle.mediaType = "movie"
-                    return mutableTitle
-                }
-            case .failure(let error):
-                fetchError = error
-            }
-            dispatchGroup.leave()
-        }
-        
-        // Fetch upcoming TV shows (assuming there's an API method for this)
-        dispatchGroup.enter()
-        // Use a method to get upcoming TV shows if available, otherwise use trending
-        APICaller.shared.getTrendingTVShows { result in
-            switch result {
-            case .success(let titles):
-                // Filter for upcoming TV shows (e.g., those with a future first air date)
-                let calendar = Calendar.current
-                let currentDate = Date()
-                
-                tvShows = titles.filter { title in
-                    if let firstAirDateString = title.firstAirDate,
-                       let date = DateFormatter.yearFormatter.date(from: firstAirDateString) {
-                        return date > currentDate
-                    }
-                    return false
-                }.map { title in
-                    var mutableTitle = title
-                    mutableTitle.mediaType = "tv"
-                    return mutableTitle
-                }
-            case .failure(let error):
-                if fetchError == nil {
-                    fetchError = error
-                }
-            }
-            dispatchGroup.leave()
-        }
-        
-        // Process results when both calls complete
-        dispatchGroup.notify(queue: .main) { [weak self] in
+        // Add to UI log if available
+        DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
-            // Hide loading indicators
-            LoadingView.shared.hideLoading()
-            self.refreshControl.endRefreshing()
+            // Append with timestamp
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "HH:mm:ss"
+            let timestamp = dateFormatter.string(from: Date())
             
-            if let error = fetchError {
-                if let appError = error as? AppError {
-                    ErrorPresenter.showError(appError, on: self)
-                } else {
-                    ErrorPresenter.showError(AppError.apiError(error.localizedDescription), on: self)
+            let newLogEntry = "[\(timestamp)] \(message)\n"
+            self.debugLogTextView.text += newLogEntry
+            
+            // Scroll to bottom
+            let bottom = NSRange(location: self.debugLogTextView.text.count, length: 0)
+            self.debugLogTextView.scrollRangeToVisible(bottom)
+        }
+    }
+    
+    @objc private func loadTestDataTapped() {
+        
+        // Reset existing data
+        upcomingTitles = []
+        
+        // Load test data
+        upcomingTitles = createTestData()
+        
+        // Apply filter and update UI
+        applyFilter()
+    }
+    
+    // MARK: - Data Loading
+    
+    @objc func fetchUpcomingContent() {
+        // Show loading state
+        refreshControl.beginRefreshing()
+        tableView.contentOffset = CGPoint(x: 0, y: -refreshControl.frame.size.height)
+        
+        
+        // Use the APICallers specialized method for calendar view
+        APICaller.shared.getUpcomingContent { [weak self] result in
+            guard let self = self else { return }
+            
+            switch result {
+            case .success(let titles):
+                // Log success
+                
+                // Store titles
+                self.upcomingTitles = titles
+                
+                // Check if we got any titles
+                if titles.isEmpty {
+                    
+                    // For debugging, load some test data if API returns empty
+                    if self.isDebugMode {
+                        self.upcomingTitles = self.createTestData()
+                    }
                 }
-                return
+                
+                // Apply filter and update UI
+                DispatchQueue.main.async {
+                    self.applyFilter()
+                }
+                
+            case .failure(let error):
+                // Log error
+                self.debugLog("❌ Error: \(error.localizedDescription)")
+                
+                // For debugging, load some test data if API fails
+                if self.isDebugMode {
+                    self.debugLog("🧪 Adding test data since API failed")
+                    self.upcomingTitles = self.createTestData()
+                    
+                    // Apply filter and update UI
+                    DispatchQueue.main.async {
+                        self.applyFilter()
+                    }
+                } else {
+                    // Show error to user
+                    DispatchQueue.main.async {
+                        self.refreshControl.endRefreshing()
+                        ErrorPresenter.showError(error, on: self)
+                    }
+                }
             }
-            
-            // Store all upcoming titles
-            self.upcomingTitles = (movies + tvShows).sorted(by: {
-                let date1 = DateFormatter.yearFormatter.date(from: $0.releaseDate ?? $0.firstAirDate ?? "") ?? Date.distantFuture
-                let date2 = DateFormatter.yearFormatter.date(from: $1.releaseDate ?? $1.firstAirDate ?? "") ?? Date.distantFuture
-                return date1 < date2
-            })
-            
-            // Apply current filter
-            self.applyFilter()
         }
     }
     
@@ -237,13 +330,17 @@ class ContentCalendarViewController: UIViewController {
         switch segmentedControl.selectedSegmentIndex {
         case 1: // Movies
             filteredTitles = upcomingTitles.filter { $0.mediaType == "movie" }
+            debugLog("🎬 Filtered to \(filteredTitles.count) movies")
         case 2: // TV Shows
             filteredTitles = upcomingTitles.filter { $0.mediaType == "tv" }
+            debugLog("📺 Filtered to \(filteredTitles.count) TV shows")
         default: // All
             filteredTitles = upcomingTitles
+            debugLog("📋 Showing all \(filteredTitles.count) titles")
         }
         
         // Group by month
+        debugLog("🗂 Grouping titles by month...")
         groupedTitles = Dictionary(grouping: filteredTitles) { title in
             let dateString = title.releaseDate ?? title.firstAirDate ?? ""
             if let date = DateFormatter.yearFormatter.date(from: dateString) {
@@ -263,14 +360,37 @@ class ContentCalendarViewController: UIViewController {
             return date1 < date2
         }
         
+        // Log the organized data
+        debugLog("📅 Organized into \(sortedMonths.count) months")
+        
         // Update UI
         updateUI()
     }
     
     private func updateUI() {
+        // Stop loading indicator
+        refreshControl.endRefreshing()
+        
+        // Debug log the groupings
+        for month in sortedMonths {
+            if let titles = groupedTitles[month] {
+                debugLog("  - \(month): \(titles.count) titles")
+                for (index, title) in titles.enumerated() {
+                    let titleName = title.originalTitle ?? title.originalName ?? "Unknown"
+                    debugLog("    \(index+1). \(titleName)")
+                }
+            }
+        }
+        
         // Show empty state if needed
         emptyStateView.isHidden = !filteredTitles.isEmpty
         tableView.isHidden = filteredTitles.isEmpty
+        
+        if filteredTitles.isEmpty {
+            debugLog("⚠️ No titles to display - showing empty state")
+        } else {
+            debugLog("📱 Displaying \(filteredTitles.count) titles in \(sortedMonths.count) months")
+        }
         
         // Update empty state message based on filter
         switch segmentedControl.selectedSegmentIndex {
@@ -282,17 +402,76 @@ class ContentCalendarViewController: UIViewController {
             emptyStateLabel.text = "No upcoming releases found"
         }
         
+        // Force layout update
+        view.setNeedsLayout()
+        view.layoutIfNeeded()
+        
         // Reload table data
         tableView.reloadData()
+        debugLog("♻️ Table view reloaded")
+        
+        // Log table view state after reload
+        debugLog("📊 Table sections: \(tableView.numberOfSections)")
+        for section in 0..<tableView.numberOfSections {
+            debugLog("  - Section \(section): \(tableView.numberOfRows(inSection: section)) rows")
+        }
+    }
+    
+    // MARK: - Test Data
+    
+    private func createTestData() -> [Title] {
+        // Create some test titles with future release dates
+        let today = Date()
+        let calendar = Calendar.current
+        
+        // Function to create a date string for n months in the future
+        func dateString(monthsFromNow: Int, day: Int = 15) -> String {
+            let futureDate = calendar.date(byAdding: .month, value: monthsFromNow, to: today)!
+            var components = calendar.dateComponents([.year, .month], from: futureDate)
+            components.day = day
+            let finalDate = calendar.date(from: components)!
+            return DateFormatter.yearFormatter.string(from: finalDate)
+        }
+        
+        // Generate test titles
+        let testTitles = [
+            // Movies
+            Title(id: 1001, mediaType: "movie", originalTitle: "Test Upcoming Movie 1", posterPath: "/uS1AIL7I1Ycgs8PTfqkFJNxjOMH.jpg", overview: "This is a test movie coming soon.", voteCount: 0, releaseDate: dateString(monthsFromNow: 1, day: 10), voteAverage: 0.0),
+            
+            Title(id: 1002, mediaType: "movie", originalTitle: "Test Upcoming Movie 2", posterPath: "/rMvPXy8PUjj1o8o1pzgQbdNCsvj.jpg", overview: "Another test movie coming soon.", voteCount: 0, releaseDate: dateString(monthsFromNow: 1, day: 22), voteAverage: 0.0),
+            
+            Title(id: 1003, mediaType: "movie", originalTitle: "Test Upcoming Movie 3", posterPath: "/vZloFAK7NmvMGKE7VkF5UHaz0I.jpg", overview: "A movie coming out in a few months.", voteCount: 0, releaseDate: dateString(monthsFromNow: 3), voteAverage: 0.0),
+            
+            // TV Shows - these need firstAirDate but we'll map it after creation
+            Title(id: 2001, mediaType: "tv", originalName: "Test Upcoming TV Show 1", posterPath: "/7WUHnWGx5OO145IRxPDUkQSh4C7.jpg", overview: "This is a test TV show coming soon.", voteCount: 0, releaseDate: dateString(monthsFromNow: 2, day: 5), voteAverage: 0.0),
+            
+            Title(id: 2002, mediaType: "tv", originalName: "Test Upcoming TV Show 2", posterPath: "/jWXrQstj7p3Wl5MfYWY6h5NRmrw.jpg", overview: "Another test TV show coming soon.", voteCount: 0, releaseDate: dateString(monthsFromNow: 3, day: 12), voteAverage: 0.0)
+        ]
+        
+        // For TV shows, copy releaseDate to firstAirDate
+        let enhancedTitles = testTitles.map { title -> Title in
+            var mutableTitle = title
+            if mutableTitle.mediaType == "tv" {
+                // Swift doesn't allow direct setting of properties, so we reimplement firstAirDate by adding it to a dictionary
+                // This is a workaround for the fact that firstAirDate isn't part of the initializer
+                mutableTitle.firstAirDate = mutableTitle.releaseDate
+            }
+            return mutableTitle
+        }
+        
+        debugLog("🧪 Created \(enhancedTitles.count) test titles")
+        return enhancedTitles
     }
     
     // MARK: - Action Methods
     
     @objc private func segmentChanged() {
+        debugLog("🔘 Segment changed to: \(segmentedControl.selectedSegmentIndex)")
         applyFilter()
     }
     
     @objc func refreshData() {
+        debugLog("🔄 Manual refresh triggered")
         fetchUpcomingContent()
     }
     
@@ -409,31 +588,57 @@ class ContentCalendarViewController: UIViewController {
 extension ContentCalendarViewController: UITableViewDelegate, UITableViewDataSource {
     
     func numberOfSections(in tableView: UITableView) -> Int {
-        return sortedMonths.count
+        let count = sortedMonths.count
+        debugLog("📊 numberOfSections called, returning \(count)")
+        return count
     }
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        guard section < sortedMonths.count else {
+            debugLog("❌ Section \(section) out of bounds (max: \(sortedMonths.count - 1))")
+            return 0
+        }
+        
         let month = sortedMonths[section]
-        return groupedTitles[month]?.count ?? 0
+        let count = groupedTitles[month]?.count ?? 0
+        debugLog("📊 numberOfRowsInSection \(section) (\(month)) called, returning \(count)")
+        return count
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        debugLog("📊 cellForRowAt \(indexPath.section):\(indexPath.row) called")
+        
         guard let cell = tableView.dequeueReusableCell(withIdentifier: TitleTableViewCell.identifier, for: indexPath) as? TitleTableViewCell else {
+            debugLog("❌ Failed to dequeue TitleTableViewCell")
             return UITableViewCell()
         }
         
+        guard indexPath.section < sortedMonths.count else {
+            debugLog("❌ Section \(indexPath.section) out of bounds")
+            return cell
+        }
+        
         let month = sortedMonths[indexPath.section]
+        
         guard let titles = groupedTitles[month], indexPath.row < titles.count else {
+            debugLog("❌ Row \(indexPath.row) out of bounds for section \(indexPath.section)")
             return cell
         }
         
         let title = titles[indexPath.row]
-        cell.configure(with: TitleViewModel(titleName: title.displayTitle, posterURL: title.posterPath ?? ""))
+        debugLog("📝 Configuring cell with \(title.displayTitle)")
+        
+        cell.configure(with: TitleViewModel(
+            titleName: title.displayTitle,
+            posterURL: title.posterPath ?? "",
+            releaseDate: title.formattedReleaseDate
+        ))
         
         return cell
     }
     
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
+        guard section < sortedMonths.count else { return nil }
         return sortedMonths[section]
     }
     
@@ -444,12 +649,15 @@ extension ContentCalendarViewController: UITableViewDelegate, UITableViewDataSou
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         
+        guard indexPath.section < sortedMonths.count else { return }
+        
         let month = sortedMonths[indexPath.section]
         guard let titles = groupedTitles[month], indexPath.row < titles.count else {
             return
         }
         
         let title = titles[indexPath.row]
+        debugLog("👆 Selected title: \(title.displayTitle)")
         
         // Show loading indicator
         LoadingView.shared.showLoading(in: view, withText: "Loading details...")
@@ -464,12 +672,12 @@ extension ContentCalendarViewController: UITableViewDelegate, UITableViewDataSou
             switch result {
             case .success(let viewController):
                 DispatchQueue.main.async {
-                    if let self = self {
-                        self.navigationController?.pushViewController(viewController, animated: true)
-                    }
+                    self?.debugLog("✅ Successfully loaded details view controller")
+                    self?.navigationController?.pushViewController(viewController, animated: true)
                 }
             case .failure(let error):
                 DispatchQueue.main.async {
+                    self?.debugLog("❌ Failed to load details: \(error.localizedDescription)")
                     if let self = self {
                         ErrorPresenter.showError(error, on: self)
                     }
@@ -479,6 +687,8 @@ extension ContentCalendarViewController: UITableViewDelegate, UITableViewDataSou
     }
     
     func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+        guard indexPath.section < sortedMonths.count else { return nil }
+        
         let month = sortedMonths[indexPath.section]
         guard let titles = groupedTitles[month], indexPath.row < titles.count else {
             return nil
@@ -488,6 +698,7 @@ extension ContentCalendarViewController: UITableViewDelegate, UITableViewDataSou
         
         // Create "Set Reminder" action
         let reminderAction = UIContextualAction(style: .normal, title: "Remind") { [weak self] (_, _, completionHandler) in
+            self?.debugLog("🔔 Set reminder action tapped for \(title.displayTitle)")
             if let self = self {
                 self.setReminder(for: title)
             }
@@ -500,9 +711,11 @@ extension ContentCalendarViewController: UITableViewDelegate, UITableViewDataSou
         
         // Create "Add to Watchlist" action
         let watchlistAction = UIContextualAction(style: .normal, title: "Watchlist") { [weak self] (_, _, completionHandler) in
+            self?.debugLog("❤️ Add to watchlist action tapped for \(title.displayTitle)")
+            
             // Check if already in watchlist
             if WatchlistManager.shared.isTitleInWatchlist(id: title.id) {
-                // Show already in watchlist message using our NotificationBanner
+                // Show already in watchlist message
                 NotificationBanner.showInfo(
                     title: "Already in Watchlist",
                     subtitle: "This title is already in your watchlist"
@@ -513,13 +726,14 @@ extension ContentCalendarViewController: UITableViewDelegate, UITableViewDataSou
                     DispatchQueue.main.async {
                         switch result {
                         case .success:
-                            // Show success message using our NotificationBanner
+                            // Show success message
                             NotificationBanner.showSuccess(
                                 title: "Added to Watchlist",
                                 subtitle: "\(title.displayTitle) has been added to your watchlist."
                             )
                         case .failure(let error):
                             if let self = self {
+                                self.debugLog("❌ Failed to add to watchlist: \(error.localizedDescription)")
                                 ErrorPresenter.showError(error, on: self)
                             }
                         }
@@ -541,7 +755,7 @@ extension ContentCalendarViewController: UITableViewDelegate, UITableViewDataSou
         guard let header = view as? UITableViewHeaderFooterView else { return }
         
         // Style header
-        header.textLabel?.font = DesignSystem.Typography.subtitle
-        header.textLabel?.textColor = DesignSystem.Colors.primary
+        header.textLabel?.font = .systemFont(ofSize: 18, weight: .semibold)
+        header.textLabel?.textColor = .systemRed
     }
 }
