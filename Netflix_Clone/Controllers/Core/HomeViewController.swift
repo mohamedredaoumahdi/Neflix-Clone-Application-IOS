@@ -2,8 +2,7 @@
 // Netflix_Clone
 //
 // Created by mohamed reda oumahdi on 27/02/2024.
-// Updated on 27/03/2025.
-//
+// Updated for full-screen hero header
 
 import UIKit
 
@@ -55,17 +54,11 @@ class HomeViewController: UIViewController {
         super.viewDidLoad()
         
         view.backgroundColor = .systemBackground
-        view.addSubview(homeFeedTable)
         
-        homeFeedTable.delegate = self
-        homeFeedTable.dataSource = self
-        homeFeedTable.refreshControl = refreshControl
-        refreshControl.addTarget(self, action: #selector(refreshData), for: .valueChanged)
-        
-        //configureNavBar()
-        
-        headerView = HeroHeaderUIView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: 500))
-        homeFeedTable.tableHeaderView = headerView
+        // Configure UI
+        setupNavigationBar()
+        setupTableView()
+        setupHeroHeader()
         
         // Show loading indicator
         LoadingView.shared.showLoading(in: view, withText: "Loading content...")
@@ -81,35 +74,92 @@ class HomeViewController: UIViewController {
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        
+        // Ensure navigation bar is hidden at top level
+        navigationController?.navigationBar.alpha = 0
+        
         print("View appeared - forcing table reload")
         homeFeedTable.reloadData()
     }
     
+    deinit {
+        // Remove observer when view controller is deallocated
+        NotificationCenter.default.removeObserver(self)
+    }
+    
     // MARK: - Setup Methods
-    /*
-    private func configureNavBar() {
-        var image = UIImage(named: "netflix_logo")
-        image = image?.withRenderingMode(.alwaysOriginal)
-        
-        navigationItem.leftBarButtonItem = UIBarButtonItem(image: image, style: .done, target: self, action: nil)
-        
-        navigationItem.rightBarButtonItems = [
-            UIBarButtonItem(image: UIImage(systemName: "person"), style: .done, target: self, action: nil),
-            UIBarButtonItem(image: UIImage(systemName: "play.rectangle"), style: .done, target: self, action: nil),
-        ]
-        
-        navigationController?.navigationBar.tintColor = .label
+    
+    private func setupNavigationBar() {
+        // Make navigation bar transparent
         navigationController?.navigationBar.setBackgroundImage(UIImage(), for: .default)
         navigationController?.navigationBar.shadowImage = UIImage()
+        navigationController?.navigationBar.isTranslucent = true
+        
+        // Hide navigation bar by default
+        navigationController?.navigationBar.alpha = 0
     }
-    */
+    
+    private func setupTableView() {
+        // Add table view to view hierarchy
+        view.addSubview(homeFeedTable)
+        
+        // Configure table
+        homeFeedTable.delegate = self
+        homeFeedTable.dataSource = self
+        
+        // Set up pull to refresh
+        homeFeedTable.refreshControl = refreshControl
+        refreshControl.addTarget(self, action: #selector(refreshData), for: .valueChanged)
+        
+        // Critical: Disable content inset adjustment to remove the gap
+        homeFeedTable.contentInsetAdjustmentBehavior = .never
+        
+        // Remove any table view insets
+        homeFeedTable.contentInset = .zero
+        homeFeedTable.scrollIndicatorInsets = .zero
+        
+        // Disable section header top padding (iOS 15+)
+        if #available(iOS 15.0, *) {
+            homeFeedTable.sectionHeaderTopPadding = 0
+        }
+    }
+    
+    private func setupHeroHeader() {
+        // Calculate status bar height (for extending header to the top)
+        let statusBarHeight = view.window?.windowScene?.statusBarManager?.statusBarFrame.height ?? 0
+        
+        // Create hero header with proper frame including status bar height
+        let headerHeight = 500 // Base height for the hero header
+        headerView = HeroHeaderUIView(frame: CGRect(
+            x: 0,
+            y: 0,
+            width: view.bounds.width,
+            height: CGFloat(headerHeight) + statusBarHeight
+        ))
+        
+        // Set as table header
+        homeFeedTable.tableHeaderView = headerView
+        
+        // Set up observer for preview button taps
+        setupHeaderPreviewHandler()
+    }
+    
+    private func setupHeaderPreviewHandler() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleHeroHeaderPreviewTap),
+            name: .heroHeaderPreviewTapped,
+            object: nil
+        )
+    }
+    
     // MARK: - Data Loading Methods
     
     @objc private func refreshData() {
-        // Refresh all sections
+        // Refresh header content
         configureHeroHeaderView()
         
-        // Reload table with animation
+        // Reload table with smooth animation
         UIView.transition(with: homeFeedTable, duration: 0.35, options: .transitionCrossDissolve, animations: {
             self.homeFeedTable.reloadData()
         }, completion: nil)
@@ -117,7 +167,6 @@ class HomeViewController: UIViewController {
     
     private func configureHeroHeaderView() {
         APICaller.shared.getTrendingMovies { [weak self] result in
-            // Always handle UI updates on the main thread
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 
@@ -131,25 +180,56 @@ class HomeViewController: UIViewController {
                     if let selectedTitle = titles.randomElement() {
                         self.randomTrendingMovie = selectedTitle
                         
-                        // Create detailed view model for header
+                        // Create view model for header
                         let viewModel = TitleViewModel(
                             titleName: selectedTitle.originalTitle ?? selectedTitle.originalName ?? "",
                             posterURL: selectedTitle.posterPath ?? ""
                         )
                         
-                        // Already on main thread
+                        // Configure header with data
                         self.headerView?.configure(with: viewModel)
                     }
                     
                 case .failure(let error):
-                    // Hide loading and show error
+                    // Hide loading indicators
                     LoadingView.shared.hideLoading()
                     self.refreshControl.endRefreshing()
                     
+                    // Show appropriate error
                     if let appError = error as? AppError {
                         ErrorPresenter.showError(appError, on: self)
                     } else {
                         ErrorPresenter.showError(AppError.apiError(error.localizedDescription), on: self)
+                    }
+                }
+            }
+        }
+    }
+    
+    @objc private func handleHeroHeaderPreviewTap() {
+        guard let title = randomTrendingMovie else {
+            return
+        }
+        
+        // Show loading indicator
+        LoadingView.shared.showLoading(in: view, withText: "Loading details...")
+        
+        // Load detailed information
+        ContentService.shared.loadDetailedTitle(for: title) { [weak self] result in
+            // Hide loading indicator
+            DispatchQueue.main.async {
+                LoadingView.shared.hideLoading()
+            }
+            
+            switch result {
+            case .success(let viewController):
+                DispatchQueue.main.async {
+                    self?.navigationController?.pushViewController(viewController, animated: true)
+                }
+            case .failure(let error):
+                DispatchQueue.main.async {
+                    if let self = self {
+                        ErrorPresenter.showError(error, on: self)
                     }
                 }
             }
@@ -184,34 +264,32 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
         switch indexPath.section {
         case Sections.TrendingMovies.rawValue:
             APICaller.shared.getTrendingMovies { [weak self] result in
-                self?.handleAPIResponse(result, for: cell,section: indexPath.section)
+                self?.handleAPIResponse(result, for: cell, section: indexPath.section)
             }
             
         case Sections.TrendingTVShows.rawValue:
             APICaller.shared.getTrendingTVShows { [weak self] result in
-                self?.handleAPIResponse(result, for: cell,section: indexPath.section)
+                self?.handleAPIResponse(result, for: cell, section: indexPath.section)
             }
             
         case Sections.Popular.rawValue:
             APICaller.shared.getPopularMovies { [weak self] result in
-                self?.handleAPIResponse(result, for: cell,section: indexPath.section)
+                self?.handleAPIResponse(result, for: cell, section: indexPath.section)
             }
             
         case Sections.UpcomingMovies.rawValue:
-            // Use the new sorted method for upcoming movies
             APICaller.shared.getUpcomingMoviesSorted { [weak self] result in
-                self?.handleAPIResponse(result, for: cell,section: indexPath.section)
+                self?.handleAPIResponse(result, for: cell, section: indexPath.section)
             }
             
         case Sections.RecentReleases.rawValue:
-            // Use the new method for recent releases
             APICaller.shared.getRecentReleases { [weak self] result in
                 self?.handleAPIResponse(result, for: cell, section: indexPath.section)
             }
             
         case Sections.TopRated.rawValue:
             APICaller.shared.getTopRatedMovies { [weak self] result in
-                self?.handleAPIResponse(result, for: cell,section: indexPath.section)
+                self?.handleAPIResponse(result, for: cell, section: indexPath.section)
             }
             
         default:
@@ -290,17 +368,25 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
     }
     
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        let defaultOffset = view.safeAreaInsets.top
-        let offset = scrollView.contentOffset.y + defaultOffset
+        let offset = scrollView.contentOffset.y
         
-        // Animate navbar hiding when scrolling down
-        navigationController?.navigationBar.transform = .init(translationX: 0, y: min(0, -offset))
+        // Show/hide navigation bar based on scroll position
+        if offset > 100 {
+            // User has scrolled down - show navigation bar with animation
+            UIView.animate(withDuration: 0.3) {
+                self.navigationController?.navigationBar.alpha = 1
+            }
+        } else {
+            // User is at the top - hide navigation bar
+            UIView.animate(withDuration: 0.3) {
+                self.navigationController?.navigationBar.alpha = 0
+            }
+        }
     }
 }
 
-// MARK: - ColletionViewTableViewCellDelegate
+// MARK: - CollectionViewTableViewCellDelegate
 
-// Update to match the new delegate methods in CollectionTableViewCell
 extension HomeViewController: ColletionViewTableViewCellDelegate {
     // Legacy method for backward compatibility
     func colletionViewTableViewCellDidTapCell(_ cell: CollectionTableViewCell, viewModel: TitlePreviewViewModel) {
