@@ -19,11 +19,11 @@ class DataPersistenceManager {
         var errorDescription: String? {
             switch self {
             case .failedToSaveData:
-                return "Failed to save title to database"
+                return "Failed to save title to database...."
             case .failedToFetchData:
-                return "Failed to fetch titles from database"
+                return "Failed to fetch titles from database...."
             case .failedToDeleteData:
-                return "Failed to delete title from database"
+                return "Failed to delete title from database...."
             }
         }
     }
