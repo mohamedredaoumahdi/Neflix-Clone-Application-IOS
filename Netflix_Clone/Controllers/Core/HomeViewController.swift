@@ -1,8 +1,8 @@
 // HomeViewController.swift
 // Netflix_Clone
 //
-// Created by mohamed reda oumahdi on 27/02/2024.
-// Updated for full-screen hero header
+// Enhanced with professional design elements and animations
+//
 
 import UIKit
 
@@ -48,6 +48,17 @@ class HomeViewController: UIViewController {
         return refreshControl
     }()
     
+    private let scrollToTopButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "arrow.up.circle.fill"), for: .normal)
+        button.tintColor = DesignSystem.Colors.primary
+        button.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        button.layer.cornerRadius = 25
+        button.alpha = 0 // Hidden initially
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+    
     // MARK: - Lifecycle Methods
     
     override func viewDidLoad() {
@@ -55,9 +66,10 @@ class HomeViewController: UIViewController {
         
         view.backgroundColor = .systemBackground
         
-        // Configure UI
+        // Setup key UI components
         setupNavigationBar()
         setupTableView()
+        setupScrollToTopButton()
         setupHeroHeader()
         
         // Show loading indicator
@@ -80,6 +92,15 @@ class HomeViewController: UIViewController {
         
         print("View appeared - forcing table reload")
         homeFeedTable.reloadData()
+    }
+    
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        
+        // Restore navigation bar when leaving the view
+        UIView.animate(withDuration: 0.2) {
+            self.navigationController?.navigationBar.alpha = 1.0
+        }
     }
     
     deinit {
@@ -124,12 +145,25 @@ class HomeViewController: UIViewController {
         }
     }
     
+    private func setupScrollToTopButton() {
+        view.addSubview(scrollToTopButton)
+        
+        NSLayoutConstraint.activate([
+            scrollToTopButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            scrollToTopButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+            scrollToTopButton.widthAnchor.constraint(equalToConstant: 50),
+            scrollToTopButton.heightAnchor.constraint(equalToConstant: 50)
+        ])
+        
+        scrollToTopButton.addTarget(self, action: #selector(scrollToTop), for: .touchUpInside)
+    }
+    
     private func setupHeroHeader() {
         // Calculate status bar height (for extending header to the top)
         let statusBarHeight = view.window?.windowScene?.statusBarManager?.statusBarFrame.height ?? 0
         
         // Create hero header with proper frame including status bar height
-        let headerHeight = 500 // Base height for the hero header
+        let headerHeight = 550 // Slightly taller for better impact
         headerView = HeroHeaderUIView(frame: CGRect(
             x: 0,
             y: 0,
@@ -153,7 +187,17 @@ class HomeViewController: UIViewController {
         )
     }
     
-    // MARK: - Data Loading Methods
+    // MARK: - UI Action Methods
+    
+    @objc private func scrollToTop() {
+        // Add haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.prepare()
+        generator.impactOccurred()
+        
+        // Scroll to top with animation
+        homeFeedTable.setContentOffset(.zero, animated: true)
+    }
     
     @objc private func refreshData() {
         // Refresh header content
@@ -164,6 +208,8 @@ class HomeViewController: UIViewController {
             self.homeFeedTable.reloadData()
         }, completion: nil)
     }
+    
+    // MARK: - Data Loading Methods
     
     private func configureHeroHeaderView() {
         APICaller.shared.getTrendingMovies { [weak self] result in
@@ -176,14 +222,23 @@ class HomeViewController: UIViewController {
                     LoadingView.shared.hideLoading()
                     self.refreshControl.endRefreshing()
                     
+                    // Filter for high-quality poster images
+                    let filteredTitles = titles.filter { $0.posterPath != nil && !($0.posterPath?.isEmpty ?? true) }
+                    
                     // Set random trending movie for header
-                    if let selectedTitle = titles.randomElement() {
+                    if let selectedTitle = filteredTitles.randomElement() ?? titles.randomElement() {
                         self.randomTrendingMovie = selectedTitle
+                        
+                        // Determine if it's a top-rated title
+                        let isTopRated = selectedTitle.voteAverage ?? 0 >= 7.5
                         
                         // Create view model for header
                         let viewModel = TitleViewModel(
                             titleName: selectedTitle.originalTitle ?? selectedTitle.originalName ?? "",
-                            posterURL: selectedTitle.posterPath ?? ""
+                            posterURL: selectedTitle.posterPath ?? "",
+                            releaseDate: selectedTitle.formattedReleaseDate,
+                            isNewRelease: false,
+                            isTopRated: isTopRated
                         )
                         
                         // Configure header with data
@@ -210,6 +265,11 @@ class HomeViewController: UIViewController {
         guard let title = randomTrendingMovie else {
             return
         }
+        
+        // Add haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.prepare()
+        generator.impactOccurred()
         
         // Show loading indicator
         LoadingView.shared.showLoading(in: view, withText: "Loading details...")
@@ -253,6 +313,15 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
         guard let cell = tableView.dequeueReusableCell(withIdentifier: CollectionTableViewCell.identifier, for: indexPath) as? CollectionTableViewCell else {
             return UITableViewCell()
         }
+        
+        // Apply subtle fade-in animation to each row
+        cell.alpha = 0
+        cell.transform = CGAffineTransform(translationX: 20, y: 0)
+        
+        UIView.animate(withDuration: 0.4, delay: 0.05 * Double(indexPath.section), options: .curveEaseOut, animations: {
+            cell.alpha = 1
+            cell.transform = .identity
+        })
         
         // Set delegate for handling cell tap events
         cell.delegate = self
@@ -314,8 +383,12 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
                     isTopRatedSection: isTopRatedSection
                 )
                 
+                // Add subtle animation when content loads
+                cell.contentLoaded()
+                
             case .failure(let error):
                 cell.hideSkeletonLoading()
+                
                 // Convert to user-friendly error message
                 let errorMessage: String
                 if let apiError = error as? APIError {
@@ -350,9 +423,16 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
         guard let header = view as? UITableViewHeaderFooterView else { return }
         
         // Style the header
-        header.textLabel?.font = .systemFont(ofSize: 18, weight: .semibold)
+        header.textLabel?.font = .systemFont(ofSize: 18, weight: .bold)
         header.textLabel?.textColor = .label
         header.textLabel?.text = header.textLabel?.text?.capitalizeFirstLetter()
+        
+        // Add a subtle red accent to the first letter
+        if let text = header.textLabel?.text, !text.isEmpty {
+            let attributedText = NSMutableAttributedString(string: text)
+            attributedText.addAttribute(.foregroundColor, value: DesignSystem.Colors.primary, range: NSRange(location: 0, length: 1))
+            header.textLabel?.attributedText = attributedText
+        }
         
         // Update frame for better positioning
         if let textLabel = header.textLabel {
@@ -370,16 +450,37 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         let offset = scrollView.contentOffset.y
         
+        // Apply parallax effect to hero header if the method exists
+        if let headerView = headerView as? HeroHeaderUIView {
+            if headerView.responds(to: #selector(HeroHeaderUIView.applyParallaxEffect(withOffset:))) {
+                headerView.perform(#selector(HeroHeaderUIView.applyParallaxEffect(withOffset:)), with: offset)
+            }
+        }
+        
         // Show/hide navigation bar based on scroll position
         if offset > 100 {
             // User has scrolled down - show navigation bar with animation
             UIView.animate(withDuration: 0.3) {
                 self.navigationController?.navigationBar.alpha = 1
             }
+            
+            // Show scroll to top button
+            if scrollToTopButton.alpha == 0 {
+                UIView.animate(withDuration: 0.3) {
+                    self.scrollToTopButton.alpha = 1
+                }
+            }
         } else {
             // User is at the top - hide navigation bar
             UIView.animate(withDuration: 0.3) {
                 self.navigationController?.navigationBar.alpha = 0
+            }
+            
+            // Hide scroll to top button
+            if scrollToTopButton.alpha == 1 {
+                UIView.animate(withDuration: 0.3) {
+                    self.scrollToTopButton.alpha = 0
+                }
             }
         }
     }
@@ -400,6 +501,11 @@ extension HomeViewController: ColletionViewTableViewCellDelegate {
     
     // New method using the updated naming
     func collectionViewDidTapCellWithViewModel(_ cell: CollectionTableViewCell, viewModel: TitlePreviewViewModel) {
+        // Add haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.prepare()
+        generator.impactOccurred()
+        
         // Present bottom sheet directly with the view model
         let bottomSheet = ContentDetailBottomSheet(with: viewModel)
         present(bottomSheet, animated: false)
@@ -407,6 +513,11 @@ extension HomeViewController: ColletionViewTableViewCellDelegate {
     
     // Updated method for handling title selection
     func collectionViewDidTapCellWithTitle(_ cell: CollectionTableViewCell, title: Title) {
+        // Add haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.prepare()
+        generator.impactOccurred()
+        
         // Show loading indicator
         LoadingView.shared.showLoading(in: view, withText: "Loading details...")
         

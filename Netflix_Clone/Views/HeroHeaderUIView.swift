@@ -3,14 +3,22 @@
 //  Netflix_Clone
 //
 //  Created by mohamed reda oumahdi on 01/03/2024.
-//  Updated with centered preview button and no title
+//  Enhanced with professional design elements
 //
 
 import UIKit
 
 class HeroHeaderUIView: UIView {
     
-    // Single preview button, positioned below center
+    // MARK: - UI Components
+    
+    private let heroHeaderImage: UIImageView = {
+        let imageView = UIImageView()
+        imageView.contentMode = .scaleAspectFill
+        imageView.clipsToBounds = true
+        return imageView
+    }()
+    
     private let previewButton: UIButton = {
         let button = UIButton()
         button.setTitle("Preview", for: .normal)
@@ -18,104 +26,134 @@ class HeroHeaderUIView: UIView {
         button.backgroundColor = DesignSystem.Colors.primary
         button.layer.cornerRadius = 8
         button.translatesAutoresizingMaskIntoConstraints = false
-        button.titleLabel?.font = .systemFont(ofSize: 16, weight: .bold)
+        button.titleLabel?.font = .systemFont(ofSize: 17, weight: .bold)
         
-        // Add shadow for better visibility
+        // Enhanced shadow for better visibility
         button.layer.shadowColor = UIColor.black.cgColor
         button.layer.shadowOpacity = 0.5
-        button.layer.shadowOffset = CGSize(width: 0, height: 2)
-        button.layer.shadowRadius = 4
+        button.layer.shadowOffset = CGSize(width: 0, height: 3)
+        button.layer.shadowRadius = 6
         
         return button
     }()
     
-    private let heroHeaderImage: UIImageView = {
-        let imageView = UIImageView()
-        imageView.contentMode = .scaleAspectFill
-        imageView.clipsToBounds = true
-        imageView.image = UIImage(named: "oppenheimerCover") // Default image
-        return imageView
-    }()
-    
-    // Add gradient to make button more visible
-    private func addGradient() {
-        let gradientLayer = CAGradientLayer()
-        gradientLayer.colors = [
-            UIColor.clear.cgColor,
-            UIColor.black.withAlphaComponent(0.4).cgColor,
-            UIColor.black.withAlphaComponent(0.6).cgColor,
-            UIColor.systemBackground.cgColor
-        ]
-        gradientLayer.locations = [0.0, 0.5, 0.8, 1.0]
-        gradientLayer.frame = bounds
-        layer.addSublayer(gradientLayer)
-    }
-    
-    private func applyConstraints() {
-        // Position button slightly below the center
-        let previewButtonConstraints = [
-            // Center horizontally
-            previewButton.centerXAnchor.constraint(equalTo: centerXAnchor),
-            
-            // Position vertically - a bit below center (center would be multiplier: 1.0)
-            previewButton.centerYAnchor.constraint(equalTo: centerYAnchor, constant: 60),
-            
-            // Size constraints
-            previewButton.widthAnchor.constraint(equalToConstant: 160),
-            previewButton.heightAnchor.constraint(equalToConstant: 48)
-        ]
-        
-        NSLayoutConstraint.activate(previewButtonConstraints)
-    }
+    // MARK: - Initialization and Setup
     
     override init(frame: CGRect) {
         super.init(frame: frame)
         
-        // Add subviews in correct order
-        addSubview(heroHeaderImage)
-        addGradient()
-        addSubview(previewButton)
-        
-        // Apply constraints and set up button action
-        applyConstraints()
-        setupAction()
-    }
-    
-    private func setupAction() {
-        previewButton.addTarget(self, action: #selector(previewButtonTapped), for: .touchUpInside)
-    }
-    
-    @objc private func previewButtonTapped() {
-        // Post notification for the view controller to handle
-        NotificationCenter.default.post(name: .heroHeaderPreviewTapped, object: nil)
-    }
-    
-    public func configure(with model: TitleViewModel) {
-        guard let url = URL(string: "https://image.tmdb.org/t/p/w500/\(model.posterURL)") else {return}
-        
-        // Load image with smooth transition
-        heroHeaderImage.sd_setImage(with: url, completed: { [weak self] _, _, _, _ in
-            UIView.transition(with: self?.heroHeaderImage ?? UIView(),
-                             duration: 0.3,
-                             options: .transitionCrossDissolve,
-                             animations: {},
-                             completion: nil)
-        })
-    }
-    
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        
-        // Make sure the image takes up the full space of the view
-        heroHeaderImage.frame = bounds
-        
-        // Remove existing gradient layers and re-add to ensure correct size
-        layer.sublayers?.filter { $0 is CAGradientLayer }.forEach { $0.removeFromSuperlayer() }
-        addGradient()
+        setupViews()
+        setupGradient()
+        setupConstraints()
+        setupActions()
     }
     
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+    
+    private func setupViews() {
+        // Add views in the correct order
+        addSubview(heroHeaderImage)
+        addSubview(previewButton)
+    }
+    
+    private func setupGradient() {
+        // Create a more sophisticated gradient
+        let gradientLayer = CAGradientLayer()
+        gradientLayer.colors = [
+            UIColor.clear.cgColor,
+            UIColor.black.withAlphaComponent(0.2).cgColor,
+            UIColor.black.withAlphaComponent(0.4).cgColor,
+            UIColor.black.withAlphaComponent(0.6).cgColor,
+            UIColor.black.withAlphaComponent(0.8).cgColor,
+            UIColor.systemBackground.cgColor
+        ]
+        gradientLayer.locations = [0.0, 0.3, 0.5, 0.7, 0.85, 1.0]
+        gradientLayer.frame = bounds
+        layer.addSublayer(gradientLayer)
+    }
+    
+    private func setupConstraints() {
+        NSLayoutConstraint.activate([
+            // Preview button (centered below middle)
+            previewButton.centerXAnchor.constraint(equalTo: centerXAnchor),
+            previewButton.centerYAnchor.constraint(equalTo: centerYAnchor, constant: 60),
+            previewButton.widthAnchor.constraint(equalToConstant: 180), // Slightly wider
+            previewButton.heightAnchor.constraint(equalToConstant: 50)  // Slightly taller
+        ])
+    }
+    
+    private func setupActions() {
+        previewButton.addTarget(self, action: #selector(previewButtonTapped), for: .touchUpInside)
+        
+        // Add touch down and touch up animations
+        previewButton.addTarget(self, action: #selector(buttonTouchDown), for: .touchDown)
+        previewButton.addTarget(self, action: #selector(buttonTouchUp), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+    }
+    
+    // MARK: - Animation Methods
+    
+    @objc private func buttonTouchDown() {
+        UIView.animate(withDuration: 0.1) {
+            self.previewButton.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
+            self.previewButton.alpha = 0.9
+        }
+    }
+    
+    @objc private func buttonTouchUp() {
+        UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 0.5, initialSpringVelocity: 0.5, options: [], animations: {
+            self.previewButton.transform = .identity
+            self.previewButton.alpha = 1.0
+        })
+    }
+    
+    @objc private func previewButtonTapped() {
+        // Add a subtle haptic feedback if available
+        if #available(iOS 10.0, *) {
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.prepare()
+            generator.impactOccurred()
+        }
+        
+        // Post notification for the view controller to handle
+        NotificationCenter.default.post(name: .heroHeaderPreviewTapped, object: nil)
+    }
+    
+    // MARK: - Configuration Methods
+    
+    public func configure(with model: TitleViewModel) {
+        guard let url = URL(string: "https://image.tmdb.org/t/p/w500/\(model.posterURL)") else { return }
+        
+        // Load image with enhanced transition
+        heroHeaderImage.alpha = 0.8
+        heroHeaderImage.sd_setImage(with: url) { [weak self] _, _, _, _ in
+            guard let self = self else { return }
+            
+            UIView.animate(withDuration: 0.5) {
+                self.heroHeaderImage.alpha = 1.0
+            }
+        }
+    }
+    
+    // MARK: - Layout Methods
+    
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        
+        // Setup the image to fill the entire view
+        heroHeaderImage.frame = bounds
+        
+        // Remove old gradient layers and add a new one
+        layer.sublayers?.filter { $0 is CAGradientLayer }.forEach { $0.removeFromSuperlayer() }
+        setupGradient()
+    }
+    
+    // Apply a subtle parallax effect based on scroll position
+    @objc func applyParallaxEffect(withOffset offset: CGFloat) {
+        let parallaxFactor: CGFloat = 0.35
+        let movement = min(0, offset) * parallaxFactor
+        heroHeaderImage.transform = CGAffineTransform(translationX: 0, y: movement)
     }
 }
 

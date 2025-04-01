@@ -427,9 +427,13 @@ extension TitlePreviewViewController: UICollectionViewDelegate, UICollectionView
             }
             
             let title = recommendations[indexPath.item]
-            if let posterPath = title.posterPath {
-                cell.configure(with: posterPath)
-            }
+            let viewModel = TitleViewModel(
+                titleName: title.originalTitle ?? title.originalName ?? "",
+                posterURL: title.posterPath ?? "",
+                releaseDate: title.releaseDate
+            )
+            
+            cell.configure(with: viewModel)
             return cell
         }
         

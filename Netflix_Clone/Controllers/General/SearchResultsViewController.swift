@@ -52,9 +52,18 @@ extension SearchResultsViewController : UICollectionViewDelegate, UICollectionVi
         guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: TitleCollectionViewCell.identifier, for: indexPath) as? TitleCollectionViewCell else {
             return UICollectionViewCell()
         }
+        
         cell.backgroundColor = .red
+        
         let title = titles[indexPath.row]
-        cell.configure(with: title.posterPath ?? "")
+        let viewModel = TitleViewModel(
+            titleName: title.originalTitle ?? title.originalName ?? "",
+            posterURL: title.posterPath ?? "",
+            releaseDate: title.releaseDate
+        )
+        
+        cell.configure(with: viewModel)
+        
         return cell
     }
 

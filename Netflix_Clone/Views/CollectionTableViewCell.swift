@@ -44,7 +44,7 @@ class CollectionTableViewCell: UITableViewCell {
     
     // MARK: - UI Components
     
-    private let collectionView: UICollectionView = {
+    let collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.itemSize = CGSize(width: 140, height: 200)
         layout.scrollDirection = .horizontal
@@ -166,43 +166,43 @@ class CollectionTableViewCell: UITableViewCell {
     
     // Updated configure method to handle recent releases section
     public func configure(with titles: [Title], isRecentReleasesSection: Bool = false, isTopRatedSection: Bool = false) {
-            self.titles = titles
+        self.titles = titles
+        
+        // Create view models based on section type and content
+        self.viewModels = titles.map { title in
+            // Check if it's a new release
+            let isNew = isRecentReleasesSection && isNewRelease(title: title)
             
-            // Create view models based on section type and content
-            self.viewModels = titles.map { title in
-                // Check if it's a new release
-                let isNew = isRecentReleasesSection && isNewRelease(title: title)
-                
-                // Check if it's top rated
-                let isTopRated = isTopRatedSection || (title.voteAverage ?? 0.0 >= 8.0)
-                
-                return TitleViewModel(
-                    titleName: title.displayTitle,
-                    posterURL: title.posterPath ?? "",
-                    releaseDate: title.formattedReleaseDate,
-                    isNewRelease: isNew,
-                    isTopRated: isTopRated
-                )
-            }
+            // Check if it's top rated
+            let isTopRated = isTopRatedSection || (title.voteAverage ?? 0.0 >= 8.0)
             
-            hideSkeletonLoading()
-            collectionView.reloadData()
+            return TitleViewModel(
+                titleName: title.displayTitle,
+                posterURL: title.posterPath ?? "",
+                releaseDate: title.formattedReleaseDate,
+                isNewRelease: isNew,
+                isTopRated: isTopRated
+            )
         }
         
-        // Helper method to determine if a title is a new release
-        private func isNewRelease(title: Title) -> Bool {
-            // Calculate threshold date for "NEW" badge (7 days)
-            let calendar = Calendar.current
-            let oneWeekAgo = calendar.date(byAdding: .day, value: -7, to: Date())!
-            
-            // Get the release date
-            let dateString = title.releaseDate ?? title.firstAirDate ?? ""
-            if let releaseDate = DateFormatter.yearFormatter.date(from: dateString) {
-                // Compare to threshold (e.g., last 7 days)
-                return releaseDate >= oneWeekAgo
-            }
-            return false
+        hideSkeletonLoading()
+        collectionView.reloadData()
+    }
+    
+    // Helper method to determine if a title is a new release
+    private func isNewRelease(title: Title) -> Bool {
+        // Calculate threshold date for "NEW" badge (7 days)
+        let calendar = Calendar.current
+        let oneWeekAgo = calendar.date(byAdding: .day, value: -7, to: Date())!
+        
+        // Get the release date
+        let dateString = title.releaseDate ?? title.firstAirDate ?? ""
+        if let releaseDate = DateFormatter.yearFormatter.date(from: dateString) {
+            // Compare to threshold (e.g., last 7 days)
+            return releaseDate >= oneWeekAgo
         }
+        return false
+    }
     
     // Returns the currently selected title if there is one, or the first title as a fallback
     func getCurrentTitle() -> Title? {
@@ -212,7 +212,10 @@ class CollectionTableViewCell: UITableViewCell {
         return titles.first
     }
     
-    func showSkeletonLoading() {
+    // MARK: - Animation Methods
+    
+    // Enhanced version that combines the previous implementations
+    public func showSkeletonLoading() {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
@@ -222,28 +225,45 @@ class CollectionTableViewCell: UITableViewCell {
             // Show and animate skeleton views
             for view in self.skeletonCells {
                 view.isHidden = false
-                
                 // Add shimmer effect
                 self.addShimmerEffect(to: view)
             }
         }
     }
     
-    func hideSkeletonLoading() {
+    // Enhanced version that combines the previous implementations
+    public func hideSkeletonLoading() {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            
-            self.collectionView.isHidden = false
             
             // Hide skeleton views and remove animations
             for view in self.skeletonCells {
                 view.isHidden = true
                 view.layer.removeAllAnimations()
             }
+            
+            // Show the collection view with a fade-in animation
+            self.collectionView.alpha = 0
+            self.collectionView.isHidden = false
+            
+            UIView.animate(withDuration: 0.3) {
+                self.collectionView.alpha = 1
+            }
         }
     }
     
-    func showError(message: String) {
+    public func contentLoaded() {
+        // Subtle animation when content loads
+        UIView.animate(withDuration: 0.3) {
+            self.collectionView.alpha = 0.8
+        } completion: { _ in
+            UIView.animate(withDuration: 0.2) {
+                self.collectionView.alpha = 1.0
+            }
+        }
+    }
+    
+    public func showError(message: String) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
@@ -299,8 +319,6 @@ class CollectionTableViewCell: UITableViewCell {
 
 extension CollectionTableViewCell: UICollectionViewDelegate, UICollectionViewDataSource {
     
-    
-    
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         return titles.count
     }
@@ -314,10 +332,16 @@ extension CollectionTableViewCell: UICollectionViewDelegate, UICollectionViewDat
         if indexPath.row < viewModels.count {
             cell.configure(with: viewModels[indexPath.row])
         } else if indexPath.row < titles.count {
-            // Fallback to old method
             let title = titles[indexPath.row]
+            
+            // Only create view model if there's a poster path
             if let posterPath = title.posterPath {
-                cell.configure(with: posterPath)
+                let viewModel = TitleViewModel(
+                    titleName: title.originalTitle ?? title.originalName ?? "",
+                    posterURL: posterPath,
+                    releaseDate: title.releaseDate
+                )
+                cell.configure(with: viewModel)
             }
         }
         
@@ -325,15 +349,15 @@ extension CollectionTableViewCell: UICollectionViewDelegate, UICollectionViewDat
     }
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-            collectionView.deselectItem(at: indexPath, animated: true)
-            
-            guard indexPath.row < titles.count else { return }
-            
-            let title = titles[indexPath.row]
-            
-            // Use the delegate to pass the title
-            delegate?.collectionViewDidTapCellWithTitle(self, title: title)
-        }
+        collectionView.deselectItem(at: indexPath, animated: true)
+        
+        guard indexPath.row < titles.count else { return }
+        
+        let title = titles[indexPath.row]
+        
+        // Use the delegate to pass the title
+        delegate?.collectionViewDidTapCellWithTitle(self, title: title)
+    }
     
     func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
         // Bounds check to prevent crashes
