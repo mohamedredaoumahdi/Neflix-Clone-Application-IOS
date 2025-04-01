@@ -22,6 +22,10 @@ class HomeViewController: UIViewController {
     private var randomTrendingMovie: Title?
     private var headerView: HeroHeaderUIView?
     
+    // Properties for handling empty sections
+    private var visibleSections: [Int] = []
+    private var emptySections: Set<Int> = []
+    
     private let sectionTitles: [String] = [
         "Trending Movies",
         "Trending TV Shows",
@@ -63,6 +67,9 @@ class HomeViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        // Initialize visible sections (all sections visible at first)
+        visibleSections = Array(0..<sectionTitles.count)
         
         view.backgroundColor = .systemBackground
         
@@ -200,6 +207,10 @@ class HomeViewController: UIViewController {
     }
     
     @objc private func refreshData() {
+        // Reset empty sections to try loading all sections again
+        emptySections.removeAll()
+        visibleSections = Array(0..<sectionTitles.count)
+        
         // Refresh header content
         configureHeroHeaderView()
         
@@ -207,6 +218,17 @@ class HomeViewController: UIViewController {
         UIView.transition(with: homeFeedTable, duration: 0.35, options: .transitionCrossDissolve, animations: {
             self.homeFeedTable.reloadData()
         }, completion: nil)
+    }
+    
+    // Helper method to update visible sections
+    private func updateVisibleSections() {
+        // Create a new array with only non-empty sections
+        visibleSections = (0..<sectionTitles.count).filter { !emptySections.contains($0) }
+        
+        // Reload the table with animation
+        UIView.transition(with: homeFeedTable, duration: 0.3, options: .transitionCrossDissolve, animations: {
+            self.homeFeedTable.reloadData()
+        })
     }
     
     // MARK: - Data Loading Methods
@@ -302,7 +324,8 @@ class HomeViewController: UIViewController {
 extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
     
     func numberOfSections(in tableView: UITableView) -> Int {
-        return sectionTitles.count
+        // Only return visible sections count
+        return visibleSections.count
     }
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -329,36 +352,39 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
         // Show loading indicator in the cell
         cell.showSkeletonLoading()
         
-        // Fetch data based on section
-        switch indexPath.section {
+        // Get the actual section index from our visible sections array
+        let actualSection = visibleSections[indexPath.section]
+        
+        // Fetch data based on actual section
+        switch actualSection {
         case Sections.TrendingMovies.rawValue:
             APICaller.shared.getTrendingMovies { [weak self] result in
-                self?.handleAPIResponse(result, for: cell, section: indexPath.section)
+                self?.handleAPIResponse(result, for: cell, section: actualSection)
             }
             
         case Sections.TrendingTVShows.rawValue:
             APICaller.shared.getTrendingTVShows { [weak self] result in
-                self?.handleAPIResponse(result, for: cell, section: indexPath.section)
+                self?.handleAPIResponse(result, for: cell, section: actualSection)
             }
             
         case Sections.Popular.rawValue:
             APICaller.shared.getPopularMovies { [weak self] result in
-                self?.handleAPIResponse(result, for: cell, section: indexPath.section)
+                self?.handleAPIResponse(result, for: cell, section: actualSection)
             }
             
         case Sections.UpcomingMovies.rawValue:
             APICaller.shared.getUpcomingMoviesSorted { [weak self] result in
-                self?.handleAPIResponse(result, for: cell, section: indexPath.section)
+                self?.handleAPIResponse(result, for: cell, section: actualSection)
             }
             
         case Sections.RecentReleases.rawValue:
             APICaller.shared.getRecentReleases { [weak self] result in
-                self?.handleAPIResponse(result, for: cell, section: indexPath.section)
+                self?.handleAPIResponse(result, for: cell, section: actualSection)
             }
             
         case Sections.TopRated.rawValue:
             APICaller.shared.getTopRatedMovies { [weak self] result in
-                self?.handleAPIResponse(result, for: cell, section: indexPath.section)
+                self?.handleAPIResponse(result, for: cell, section: actualSection)
             }
             
         default:
@@ -369,9 +395,25 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
     }
     
     private func handleAPIResponse(_ result: Result<[Title], Error>, for cell: CollectionTableViewCell, section: Int) {
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
             switch result {
             case .success(let titles):
+                // Check if titles array is empty
+                if titles.isEmpty {
+                    // If empty, hide this section
+                    self.emptySections.insert(section)
+                    self.updateVisibleSections()
+                    return
+                }
+                
+                // If we have content, make sure section is visible
+                if self.emptySections.contains(section) {
+                    self.emptySections.remove(section)
+                    self.updateVisibleSections()
+                }
+                
                 // Check which section we're processing
                 let isRecentReleasesSection = section == Sections.RecentReleases.rawValue
                 let isTopRatedSection = section == Sections.TopRated.rawValue
@@ -387,26 +429,11 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
                 cell.contentLoaded()
                 
             case .failure(let error):
-                cell.hideSkeletonLoading()
+                // Hide section on error
+                self.emptySections.insert(section)
+                self.updateVisibleSections()
                 
-                // Convert to user-friendly error message
-                let errorMessage: String
-                if let apiError = error as? APIError {
-                    switch apiError {
-                    case .failedToGetData:
-                        errorMessage = "Couldn't load content. Please try again."
-                    case .invalidURL:
-                        errorMessage = "Invalid URL. Please report this issue."
-                    case .noDataReturned:
-                        errorMessage = "No data received from server."
-                    case .decodingError:
-                        errorMessage = "Error processing the data."
-                    }
-                } else {
-                    errorMessage = "Something went wrong. Try refreshing."
-                }
-                cell.showError(message: errorMessage)
-                print("Error: \(error.localizedDescription)")
+                print("Error in section \(section): \(error.localizedDescription)")
             }
         }
     }
@@ -444,7 +471,9 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
     }
     
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        return sectionTitles[section]
+        // Use the visibleSections array to map to the correct section title
+        let actualSection = visibleSections[section]
+        return sectionTitles[actualSection]
     }
     
     func scrollViewDidScroll(_ scrollView: UIScrollView) {

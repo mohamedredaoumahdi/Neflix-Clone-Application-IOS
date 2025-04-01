@@ -146,7 +146,13 @@ class APICaller {
     
     // CENTRALIZED METHOD: Get upcoming movies with pagination
     func getUPComingMovies(page: Int = 1, completion: @escaping (Result<TrendingTitleResponse, Error>) -> Void) {
-        guard let url = URL(string: "\(Configuration.URLs.TMDB_BASE_URL)/movie/upcoming?language=en-US&page=\(page)") else {
+        // Format today's date as YYYY-MM-DD
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let todayString = dateFormatter.string(from: Date())
+        
+        // Construct URL with today's date as the minimum
+        guard let url = URL(string: "\(Configuration.URLs.TMDB_BASE_URL)/movie/upcoming?language=en-US&page=\(page)&primary_release_date.gte=\(todayString)") else {
             completion(.failure(APIError.invalidURL))
             return
         }
@@ -495,16 +501,44 @@ extension APICaller {
         getUPComingMovies { result in
             switch result {
             case .success(let titles):
+                // Debug: Print total number of titles
+                print("💡 Total titles received: \(titles.count)")
+                
+                // Debug: Print all release dates
+                print("🗓️ Release Dates:")
+                titles.forEach { title in
+                    print("- \(title.originalTitle ?? "Unknown Title"): \(title.releaseDate ?? "No Date")")
+                }
+                
                 // Get today's date
                 let today = Date()
+                print("📅 Today's date: \(today)")
                 
-                // Filter for future releases
+                // Create a flexible date formatter
+                let dateFormatter = DateFormatter()
+                dateFormatter.dateFormat = "yyyy-MM-dd"
+                
+                // Filter for future releases with more detailed logging
                 let futureReleases = titles.filter { title in
-                    if let dateString = title.releaseDate,
-                       let releaseDate = DateFormatter.yearFormatter.date(from: dateString) {
-                        return releaseDate >= today
+                    guard let dateString = title.releaseDate else {
+                        print("⚠️ No release date for title: \(title.originalTitle ?? "Unknown")")
+                        return false
                     }
-                    return false
+                    
+                    if let releaseDate = dateFormatter.date(from: dateString) {
+                        let isFutureRelease = releaseDate >= today
+                        print("🔍 Title: \(title.originalTitle ?? "Unknown"), Date: \(dateString), Is Future Release: \(isFutureRelease)")
+                        return isFutureRelease
+                    } else {
+                        print("❌ Failed to parse date: \(dateString) for title: \(title.originalTitle ?? "Unknown")")
+                        return false
+                    }
+                }
+                
+                // Debug: Print future releases
+                print("🚀 Future Releases Count: \(futureReleases.count)")
+                futureReleases.forEach { title in
+                    print("✅ Future Title: \(title.originalTitle ?? "Unknown"), Release Date: \(title.releaseDate ?? "No Date")")
                 }
                 
                 // Sort by release date (closest first)
@@ -512,8 +546,8 @@ extension APICaller {
                     let date1String = title1.releaseDate ?? ""
                     let date2String = title2.releaseDate ?? ""
                     
-                    if let date1 = DateFormatter.yearFormatter.date(from: date1String),
-                       let date2 = DateFormatter.yearFormatter.date(from: date2String) {
+                    if let date1 = dateFormatter.date(from: date1String),
+                       let date2 = dateFormatter.date(from: date2String) {
                         return date1 < date2 // Ascending order (closest first)
                     }
                     return false
@@ -522,6 +556,7 @@ extension APICaller {
                 completion(.success(sortedTitles))
                 
             case .failure(let error):
+                print("❌ Error fetching upcoming movies: \(error.localizedDescription)")
                 completion(.failure(error))
             }
         }
