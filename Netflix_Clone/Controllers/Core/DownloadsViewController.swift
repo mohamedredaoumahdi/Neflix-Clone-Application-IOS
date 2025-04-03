@@ -76,13 +76,13 @@ extension DownloadsViewController: UITableViewDelegate, UITableViewDataSource {
         }
         
         let title = titles[indexPath.row]
-        cell.configure(with: TitleViewModel(titleName: (title.original_title ?? title.original_name) ?? "Unknown title name", posterURL: title.poster_path ?? ""))
+        cell.configure(with: TitleViewModel(titleName: (title.original_title ?? title.original_name) ?? "Unknown title name", posterURL: title.poster_path ?? ""),overview: title.overview)
         return cell
     }
     
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        return 140
+        return 180
     }
     
     

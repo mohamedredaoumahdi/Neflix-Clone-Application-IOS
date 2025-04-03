@@ -430,13 +430,14 @@ extension UpComingViewController: UITableViewDelegate, UITableViewDataSource {
         }
         
         let title = titles[indexPath.row]
+        cell.configure(with: title)
         
         // Configure cell with view model
-        cell.configure(with: TitleViewModel(
-            titleName: title.displayTitle,
-            posterURL: title.posterPath ?? "",
-            releaseDate: title.formattedReleaseDate
-        ))
+        //cell.configure(with: TitleViewModel(
+        //    titleName: title.displayTitle,
+        //    posterURL: title.posterPath ?? "",
+        //    releaseDate: title.formattedReleaseDate
+        //))
         
         // Apply animation
         cell.transform = CGAffineTransform(translationX: 20, y: 0)
@@ -451,7 +452,7 @@ extension UpComingViewController: UITableViewDelegate, UITableViewDataSource {
     }
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        return 150
+        return 180
     }
     
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
