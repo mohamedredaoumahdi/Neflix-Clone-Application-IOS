@@ -1,9 +1,8 @@
+// UpComingViewController.swift
+// Netflix_Clone
 //
-//  UpComingViewController.swift
-//  Netflix_Clone
-//
-//  Created by mohamed reda oumahdi on 27/02/2024.
-//  Updated on 28/03/2025.
+// Created by mohamed reda oumahdi on 27/02/2024.
+// Updated on 28/03/2025.
 //
 
 import UIKit
@@ -16,9 +15,10 @@ class UpComingViewController: UIViewController {
     private var currentPage = 1
     private var isLoadingMore = false
     private var totalPages = 1
+    private var contentType = "all" // "all", "movies", "tvshows"
     
     private let segmentedControl: UISegmentedControl = {
-        let segmentControl = UISegmentedControl(items: ["List View", "Calendar"])
+        let segmentControl = UISegmentedControl(items: ["All", "Movies", "TV Shows"])
         segmentControl.selectedSegmentIndex = 0
         segmentControl.translatesAutoresizingMaskIntoConstraints = false
         return segmentControl
@@ -36,17 +36,32 @@ class UpComingViewController: UIViewController {
     
     private let refreshControl = UIRefreshControl()
     
-    private lazy var calendarContainerView: UIView = {
+    // Calendar views removed
+    
+    private let emptyStateView: UIView = {
         let view = UIView()
-        view.translatesAutoresizingMaskIntoConstraints = false
         view.isHidden = true
+        view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
     
-    private lazy var calendarViewController: ContentCalendarViewController = {
-        let viewController = ContentCalendarViewController()
-        self.add(viewController, to: calendarContainerView)
-        return viewController
+    private let emptyStateImageView: UIImageView = {
+        let imageView = UIImageView()
+        imageView.image = UIImage(systemName: "calendar.badge.clock")
+        imageView.contentMode = .scaleAspectFit
+        imageView.tintColor = .systemGray
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+    
+    private let emptyStateLabel: UILabel = {
+        let label = UILabel()
+        label.text = "No upcoming releases found"
+        label.font = .systemFont(ofSize: 18, weight: .semibold)
+        label.textColor = .systemGray
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
     }()
     
     // MARK: - Lifecycle Methods
@@ -55,7 +70,8 @@ class UpComingViewController: UIViewController {
         super.viewDidLoad()
         setupUI()
         setupTableView()
-        fetchUpcomingMovies()
+        setupEmptyState()
+        fetchUpcomingContent()
     }
     
     override func viewDidLayoutSubviews() {
@@ -76,8 +92,9 @@ class UpComingViewController: UIViewController {
         // Add table view
         view.addSubview(upcomingTable)
         
-        // Add calendar container view
-        view.addSubview(calendarContainerView)
+        
+        // Add empty state view
+        view.addSubview(emptyStateView)
         
         // Set up constraints
         NSLayoutConstraint.activate([
@@ -92,11 +109,11 @@ class UpComingViewController: UIViewController {
             upcomingTable.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             upcomingTable.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
-            // Calendar container view
-            calendarContainerView.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: 8),
-            calendarContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            calendarContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            calendarContainerView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            
+            // Empty state view
+            emptyStateView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            emptyStateView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            emptyStateView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.8)
         ])
         
         // Apply design system
@@ -110,6 +127,25 @@ class UpComingViewController: UIViewController {
         // Add pull to refresh
         refreshControl.addTarget(self, action: #selector(refreshData), for: .valueChanged)
         upcomingTable.refreshControl = refreshControl
+    }
+    
+    private func setupEmptyState() {
+        // Add subviews to empty state view
+        emptyStateView.addSubview(emptyStateImageView)
+        emptyStateView.addSubview(emptyStateLabel)
+        
+        // Set up constraints for empty state elements
+        NSLayoutConstraint.activate([
+            emptyStateImageView.topAnchor.constraint(equalTo: emptyStateView.topAnchor),
+            emptyStateImageView.centerXAnchor.constraint(equalTo: emptyStateView.centerXAnchor),
+            emptyStateImageView.widthAnchor.constraint(equalToConstant: 80),
+            emptyStateImageView.heightAnchor.constraint(equalToConstant: 80),
+            
+            emptyStateLabel.topAnchor.constraint(equalTo: emptyStateImageView.bottomAnchor, constant: 16),
+            emptyStateLabel.leadingAnchor.constraint(equalTo: emptyStateView.leadingAnchor),
+            emptyStateLabel.trailingAnchor.constraint(equalTo: emptyStateView.trailingAnchor),
+            emptyStateLabel.bottomAnchor.constraint(equalTo: emptyStateView.bottomAnchor)
+        ])
     }
     
     private func applyDesignSystem() {
@@ -126,18 +162,11 @@ class UpComingViewController: UIViewController {
         ], for: .normal)
     }
     
-    // Helper to add child view controller
-    private func add(_ child: UIViewController, to containerView: UIView) {
-        addChild(child)
-        containerView.addSubview(child.view)
-        child.view.frame = containerView.bounds
-        child.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        child.didMove(toParent: self)
-    }
+    // Helper method removed
     
     // MARK: - Data Methods
     
-    private func fetchUpcomingMovies(page: Int = 1) {
+    private func fetchUpcomingContent(page: Int = 1) {
         // Show loading indicator for first page
         if page == 1 && !refreshControl.isRefreshing {
             LoadingView.shared.showLoading(in: view, withText: "Loading coming soon...")
@@ -146,7 +175,18 @@ class UpComingViewController: UIViewController {
         // Set loading state
         isLoadingMore = true
         
-        // Use the main APICaller method (not the local extension)
+        // Determine which content to fetch based on selected segment
+        switch contentType {
+        case "movies":
+            fetchUpcomingMovies(page: page)
+        case "tvshows":
+            fetchUpcomingTVShows(page: page)
+        default:
+            fetchAllUpcomingContent(page: page)
+        }
+    }
+    
+    private func fetchUpcomingMovies(page: Int) {
         APICaller.shared.getUPComingMovies(page: page) { [weak self] result in
             guard let self = self else { return }
             
@@ -160,22 +200,49 @@ class UpComingViewController: UIViewController {
                 
                 switch result {
                 case .success(let response):
+                    // Get today's date
+                    let today = Date()
+                    let dateFormatter = DateFormatter.yearFormatter
+                    
+                    // Filter results to only include future releases
+                    let upcomingMovies = response.results.filter { movie in
+                        guard let dateString = movie.releaseDate else {
+                            return false
+                        }
+                        
+                        if let releaseDate = dateFormatter.date(from: dateString) {
+                            let calendar = Calendar.current
+                            return calendar.startOfDay(for: releaseDate) >= calendar.startOfDay(for: today)
+                        }
+                        return false
+                    }
+                    
+                    // Sort by nearest release date
+                    let sortedMovies = upcomingMovies.sorted { (movie1, movie2) -> Bool in
+                        let date1String = movie1.releaseDate ?? ""
+                        let date2String = movie2.releaseDate ?? ""
+                        
+                        if let date1 = dateFormatter.date(from: date1String),
+                           let date2 = dateFormatter.date(from: date2String) {
+                            return date1 < date2 // Closest date first
+                        }
+                        return false
+                    }
+                
                     // For first page, replace data
                     if page == 1 {
-                        self.titles = response.results
+                        self.titles = sortedMovies
                     } else {
                         // For subsequent pages, append data
-                        self.titles.append(contentsOf: response.results)
+                        self.titles.append(contentsOf: sortedMovies)
                     }
                     
                     // Store pagination info
                     self.currentPage = page
                     self.totalPages = response.totalPages ?? 1
                     
-                    // Reload table data
-                    UIView.transition(with: self.upcomingTable, duration: 0.3, options: .transitionCrossDissolve, animations: {
-                        self.upcomingTable.reloadData()
-                    }, completion: nil)
+                    // Update UI
+                    self.updateUI()
                 
                 case .failure(let error):
                     ErrorPresenter.showError(error, on: self)
@@ -184,36 +251,169 @@ class UpComingViewController: UIViewController {
         }
     }
     
+    private func fetchUpcomingTVShows(page: Int) {
+        APICaller.shared.getUpcomingTVShows { [weak self] result in
+            guard let self = self else { return }
+            
+            // Update loading state
+            self.isLoadingMore = false
+            
+            DispatchQueue.main.async {
+                // Hide loading indicators
+                LoadingView.shared.hideLoading()
+                self.refreshControl.endRefreshing()
+                
+                switch result {
+                case .success(let tvShows):
+                    // Get today's date
+                    let today = Date()
+                    let dateFormatter = DateFormatter.yearFormatter
+                    
+                    // Filter results to only include future releases
+                    let upcomingShows = tvShows.filter { show in
+                        guard let dateString = show.firstAirDate ?? show.releaseDate else {
+                            return false
+                        }
+                        
+                        if let airDate = dateFormatter.date(from: dateString) {
+                            let calendar = Calendar.current
+                            return calendar.startOfDay(for: airDate) >= calendar.startOfDay(for: today)
+                        }
+                        return false
+                    }
+                    
+                    // Sort by nearest release date
+                    let sortedShows = upcomingShows.sorted { (show1, show2) -> Bool in
+                        let date1String = show1.firstAirDate ?? show1.releaseDate ?? ""
+                        let date2String = show2.firstAirDate ?? show2.releaseDate ?? ""
+                        
+                        if let date1 = dateFormatter.date(from: date1String),
+                           let date2 = dateFormatter.date(from: date2String) {
+                            return date1 < date2 // Closest date first
+                        }
+                        return false
+                    }
+                    
+                    // Replace data
+                    self.titles = sortedShows
+                    
+                    // Update UI
+                    self.updateUI()
+                
+                case .failure(let error):
+                    ErrorPresenter.showError(error, on: self)
+                }
+            }
+        }
+    }
+    
+    private func fetchAllUpcomingContent(page: Int) {
+        APICaller.shared.getUpcomingContent { [weak self] result in
+            guard let self = self else { return }
+            
+            // Update loading state
+            self.isLoadingMore = false
+            
+            DispatchQueue.main.async {
+                // Hide loading indicators
+                LoadingView.shared.hideLoading()
+                self.refreshControl.endRefreshing()
+                
+                switch result {
+                case .success(let titles):
+                    // Replace data (combined endpoint doesn't support pagination)
+                    // Filter to only include future releases
+                    let today = Date()
+                    let dateFormatter = DateFormatter.yearFormatter
+                    
+                    let upcomingTitles = titles.filter { title in
+                        let dateString = title.releaseDate ?? title.firstAirDate ?? ""
+                        if let date = dateFormatter.date(from: dateString) {
+                            // Include titles releasing today or in the future
+                            let calendar = Calendar.current
+                            return calendar.startOfDay(for: date) >= calendar.startOfDay(for: today)
+                        }
+                        return false // If we can't parse the date, exclude it
+                    }
+                    
+                    // Sort by release date (nearest first)
+                    self.titles = upcomingTitles.sorted { title1, title2 in
+                        let date1String = title1.releaseDate ?? title1.firstAirDate ?? ""
+                        let date2String = title2.releaseDate ?? title2.firstAirDate ?? ""
+                        
+                        let date1 = dateFormatter.date(from: date1String) ?? Date.distantFuture
+                        let date2 = dateFormatter.date(from: date2String) ?? Date.distantFuture
+                        
+                        return date1 < date2
+                    }
+                    
+                    // Update UI
+                    self.updateUI()
+                
+                case .failure(let error):
+                    ErrorPresenter.showError(error, on: self)
+                }
+            }
+        }
+    }
+    
+    private func updateUI() {
+        // Show empty state view if no data
+        emptyStateView.isHidden = !titles.isEmpty
+        upcomingTable.isHidden = titles.isEmpty
+        
+        // Update empty state message based on filter
+        if titles.isEmpty {
+            switch contentType {
+            case "movies":
+                emptyStateLabel.text = "No upcoming movies found"
+            case "tvshows":
+                emptyStateLabel.text = "No upcoming TV shows found"
+            default:
+                emptyStateLabel.text = "No upcoming releases found"
+            }
+        }
+        
+        // Reload table data with animation
+        UIView.transition(with: upcomingTable, duration: 0.3, options: .transitionCrossDissolve, animations: {
+            self.upcomingTable.reloadData()
+        })
+    }
+    
     private func loadMoreData() {
-        // Check if we can load more pages
-        if !isLoadingMore && currentPage < totalPages {
-            fetchUpcomingMovies(page: currentPage + 1)
+        // Check if we can load more pages (only for movies since TV shows don't support pagination)
+        if !isLoadingMore && currentPage < totalPages && contentType == "movies" {
+            fetchUpcomingContent(page: currentPage + 1)
         }
     }
     
     // MARK: - Action Methods
     
     @objc private func segmentChanged() {
-        if segmentedControl.selectedSegmentIndex == 0 {
-            // Show list view
-            calendarContainerView.isHidden = true
+        // Update content type based on selected segment
+        switch segmentedControl.selectedSegmentIndex {
+        case 1:
+            contentType = "movies"
             upcomingTable.isHidden = false
-        } else {
-            // Show calendar view
-            calendarContainerView.isHidden = false
-            upcomingTable.isHidden = true
-            calendarViewController.refreshData()
+            emptyStateView.isHidden = true
+            fetchUpcomingContent()
+        case 2:
+            contentType = "tvshows"
+            upcomingTable.isHidden = false
+            emptyStateView.isHidden = true
+            fetchUpcomingContent()
+        default:
+            contentType = "all"
+            upcomingTable.isHidden = false
+            emptyStateView.isHidden = true
+            fetchUpcomingContent()
         }
     }
     
     @objc private func refreshData() {
-        if segmentedControl.selectedSegmentIndex == 0 {
-            // Refresh list view
-            fetchUpcomingMovies()
-        } else {
-            // Refresh calendar view
-            calendarViewController.refreshData()
-        }
+        // Reset and refresh content
+        currentPage = 1
+        fetchUpcomingContent()
     }
 }
 
@@ -306,12 +506,10 @@ extension UpComingViewController: UITableViewDelegate, UITableViewDataSource {
         let watchlistAction = UIContextualAction(style: .normal, title: "Watchlist") { [weak self] (_, _, completionHandler) in
             if WatchlistManager.shared.isTitleInWatchlist(id: title.id) {
                 // Show already in watchlist message
-                let banner = NotificationBanner(
+                NotificationBanner.showInfo(
                     title: "Already in Watchlist",
-                    subtitle: "\(title.displayTitle) is already in your watchlist",
-                    style: .info
+                    subtitle: "\(title.displayTitle) is already in your watchlist"
                 )
-                banner.show()
             } else {
                 // Add to watchlist
                 WatchlistManager.shared.addToWatchlist(title: title) { result in
@@ -319,12 +517,10 @@ extension UpComingViewController: UITableViewDelegate, UITableViewDataSource {
                         switch result {
                         case .success:
                             // Show success message
-                            let banner = NotificationBanner(
+                            NotificationBanner.showSuccess(
                                 title: "Added to Watchlist",
-                                subtitle: "\(title.displayTitle) has been added to your watchlist",
-                                style: .success
+                                subtitle: "\(title.displayTitle) has been added to your watchlist"
                             )
-                            banner.show()
                         case .failure(let error):
                             if let self = self {
                                 ErrorPresenter.showError(error, on: self)
@@ -340,31 +536,7 @@ extension UpComingViewController: UITableViewDelegate, UITableViewDataSource {
         watchlistAction.backgroundColor = DesignSystem.Colors.accent
         watchlistAction.image = UIImage(systemName: "heart.fill")
         
-        // Create "Set Reminder" action
-        let reminderAction = UIContextualAction(style: .normal, title: "Remind") { [weak self] (_, _, completionHandler) in
-            self?.calendarViewController.setReminder(for: title)
-            completionHandler(true)
-        }
-        
-        // Configure appearance
-        reminderAction.backgroundColor = DesignSystem.Colors.success
-        reminderAction.image = UIImage(systemName: "bell.fill")
-        
-        // Create and return action configuration
-        return UISwipeActionsConfiguration(actions: [watchlistAction, reminderAction])
+        // Create and return action configuration with only watchlist action
+        return UISwipeActionsConfiguration(actions: [watchlistAction])
     }
 }
-
-/* REMOVE THIS EXTENSION - Now using the centralized method in APICaller.swift */
-// extension APICaller {
-//     // Get upcoming movies with pagination
-//     func getUPComingMovies(page: Int = 1, completion: @escaping (Result<TrendingTitleResponse, Error>) -> Void) {
-//         guard let url = URL(string: "\(Configuration.URLs.TMDB_BASE_URL)/movie/upcoming?language=en-US&page=\(page)") else {
-//             completion(.failure(APIError.invalidURL))
-//             return
-//         }
-//
-//         let request = createRequest(with: url)
-//         executeRequest(request: request, completion: completion)
-//     }
-// }
