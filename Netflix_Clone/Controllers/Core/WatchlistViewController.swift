@@ -272,6 +272,7 @@ extension WatchlistViewController: UITableViewDelegate, UITableViewDataSource {
         
         // Configure with overview
         cell.configure(with: viewModel, overview: item.overview)
+        cell.watchlistButton.isHidden = true
         return cell
     }
     

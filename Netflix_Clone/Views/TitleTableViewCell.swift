@@ -5,7 +5,7 @@ import UIKit
 import SDWebImage
 
 protocol TitleTableViewCellDelegate: AnyObject {
-    func addToWatchlistButtonTapped(for title: Title)
+    func addToWatchlistButtonTapped(for title: Title, completion: ((Bool) -> Void)?)
 }
 
 class TitleTableViewCell: UITableViewCell {
@@ -55,7 +55,7 @@ class TitleTableViewCell: UITableViewCell {
         return imageView
     }()
     
-    private let watchlistButton: UIButton = {
+    public let watchlistButton: UIButton = {
         let button = UIButton(type: .system)
         button.setImage(UIImage(systemName: "plus"), for: .normal)
         button.tintColor = .white
@@ -295,9 +295,6 @@ class TitleTableViewCell: UITableViewCell {
     @objc private func watchlistButtonTapped() {
         guard let title = titleModel else { return }
         
-        // Notify delegate
-        delegate?.addToWatchlistButtonTapped(for: title)
-        
         // Provide haptic feedback
         if #available(iOS 10.0, *) {
             let generator = UIImpactFeedbackGenerator(style: .medium)
@@ -305,9 +302,21 @@ class TitleTableViewCell: UITableViewCell {
             generator.impactOccurred()
         }
         
-        // Toggle appearance
+        // Determine current watchlist status
         let isCurrentlyInWatchlist = WatchlistManager.shared.isTitleInWatchlist(id: title.id)
+        
+        // Optimistically update UI
         updateWatchlistButtonAppearance(isInWatchlist: !isCurrentlyInWatchlist)
+        
+        // Notify delegate with completion handler
+        delegate?.addToWatchlistButtonTapped(for: title) { [weak self] success in
+            DispatchQueue.main.async {
+                // If the operation failed, revert the UI
+                if !success {
+                    self?.updateWatchlistButtonAppearance(isInWatchlist: isCurrentlyInWatchlist)
+                }
+            }
+        }
     }
     
     // MARK: - Selection Animation

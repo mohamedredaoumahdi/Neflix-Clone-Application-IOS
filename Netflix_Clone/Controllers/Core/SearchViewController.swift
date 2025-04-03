@@ -72,6 +72,7 @@ extension SearchViewController : UITableViewDelegate, UITableViewDataSource {
         guard let cell = tableView.dequeueReusableCell(withIdentifier: TitleTableViewCell.identifier, for: indexPath) as? TitleTableViewCell else {return UITableViewCell()}
         let title = titles[indexPath.row]
         cell.configure(with: title)
+        cell.delegate = self
         //cell.configure(with: TitleViewModel(titleName: (title.originalTitle ?? title.originalName ?? "Unknown"), posterURL: title.posterPath ?? ""))
         return cell
     }
@@ -144,4 +145,32 @@ extension SearchViewController : UISearchResultsUpdating , SearchResultsViewCont
     
     
     
+}
+
+extension SearchViewController: TitleTableViewCellDelegate {
+    func addToWatchlistButtonTapped(for title: Title, completion: ((Bool) -> Void)?) {
+        if WatchlistManager.shared.isTitleInWatchlist(id: title.id) {
+            // Remove from watchlist
+            WatchlistManager.shared.removeFromWatchlist(id: title.id) { result in
+                switch result {
+                case .success:
+                    NotificationCenter.default.post(name: .watchlistUpdated, object: nil)
+                    completion?(true)
+                case .failure:
+                    completion?(false)
+                }
+            }
+        } else {
+            // Add to watchlist
+            WatchlistManager.shared.addToWatchlist(title: title) { result in
+                switch result {
+                case .success:
+                    NotificationCenter.default.post(name: .watchlistUpdated, object: nil)
+                    completion?(true)
+                case .failure:
+                    completion?(false)
+                }
+            }
+        }
+    }
 }

@@ -440,6 +440,7 @@ extension ContentCalendarViewController: UITableViewDelegate, UITableViewDataSou
             posterURL: title.posterPath ?? "",
             releaseDate: title.formattedReleaseDate
         ))
+        cell.delegate = self
         
         return cell
     }
@@ -557,5 +558,34 @@ extension ContentCalendarViewController: UITableViewDelegate, UITableViewDataSou
         // Style header
         header.textLabel?.font = .systemFont(ofSize: 18, weight: .semibold)
         header.textLabel?.textColor = .systemRed
+    }
+}
+
+
+extension ContentCalendarViewController: TitleTableViewCellDelegate {
+    func addToWatchlistButtonTapped(for title: Title, completion: ((Bool) -> Void)?) {
+        if WatchlistManager.shared.isTitleInWatchlist(id: title.id) {
+            // Remove from watchlist
+            WatchlistManager.shared.removeFromWatchlist(id: title.id) { result in
+                switch result {
+                case .success:
+                    NotificationCenter.default.post(name: .watchlistUpdated, object: nil)
+                    completion?(true)
+                case .failure:
+                    completion?(false)
+                }
+            }
+        } else {
+            // Add to watchlist
+            WatchlistManager.shared.addToWatchlist(title: title) { result in
+                switch result {
+                case .success:
+                    NotificationCenter.default.post(name: .watchlistUpdated, object: nil)
+                    completion?(true)
+                case .failure:
+                    completion?(false)
+                }
+            }
+        }
     }
 }

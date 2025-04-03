@@ -431,7 +431,7 @@ extension UpComingViewController: UITableViewDelegate, UITableViewDataSource {
         
         let title = titles[indexPath.row]
         cell.configure(with: title)
-        
+        cell.delegate = self
         // Configure cell with view model
         //cell.configure(with: TitleViewModel(
         //    titleName: title.displayTitle,
@@ -539,5 +539,34 @@ extension UpComingViewController: UITableViewDelegate, UITableViewDataSource {
         
         // Create and return action configuration with only watchlist action
         return UISwipeActionsConfiguration(actions: [watchlistAction])
+    }
+}
+
+
+extension UpComingViewController: TitleTableViewCellDelegate {
+    func addToWatchlistButtonTapped(for title: Title, completion: ((Bool) -> Void)?) {
+        if WatchlistManager.shared.isTitleInWatchlist(id: title.id) {
+            // Remove from watchlist
+            WatchlistManager.shared.removeFromWatchlist(id: title.id) { result in
+                switch result {
+                case .success:
+                    NotificationCenter.default.post(name: .watchlistUpdated, object: nil)
+                    completion?(true)
+                case .failure:
+                    completion?(false)
+                }
+            }
+        } else {
+            // Add to watchlist
+            WatchlistManager.shared.addToWatchlist(title: title) { result in
+                switch result {
+                case .success:
+                    NotificationCenter.default.post(name: .watchlistUpdated, object: nil)
+                    completion?(true)
+                case .failure:
+                    completion?(false)
+                }
+            }
+        }
     }
 }

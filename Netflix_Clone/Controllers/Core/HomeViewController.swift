@@ -577,3 +577,31 @@ extension HomeViewController: ColletionViewTableViewCellDelegate {
         collectionViewDidTapCellWithTitle(cell, title: title)
     }
 }
+
+extension HomeViewController: TitleTableViewCellDelegate {
+    func addToWatchlistButtonTapped(for title: Title, completion: ((Bool) -> Void)?) {
+        if WatchlistManager.shared.isTitleInWatchlist(id: title.id) {
+            // Remove from watchlist
+            WatchlistManager.shared.removeFromWatchlist(id: title.id) { result in
+                switch result {
+                case .success:
+                    NotificationCenter.default.post(name: .watchlistUpdated, object: nil)
+                    completion?(true)
+                case .failure:
+                    completion?(false)
+                }
+            }
+        } else {
+            // Add to watchlist
+            WatchlistManager.shared.addToWatchlist(title: title) { result in
+                switch result {
+                case .success:
+                    NotificationCenter.default.post(name: .watchlistUpdated, object: nil)
+                    completion?(true)
+                case .failure:
+                    completion?(false)
+                }
+            }
+        }
+    }
+}
