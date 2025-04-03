@@ -1,14 +1,21 @@
 // TitleTableViewCell.swift
-// Netflix_Clone
-//
-// Updated design with enhanced aesthetics and removed play button
+// Updated with Add to My List functionality
 
 import UIKit
 import SDWebImage
 
+protocol TitleTableViewCellDelegate: AnyObject {
+    func addToWatchlistButtonTapped(for title: Title)
+}
+
 class TitleTableViewCell: UITableViewCell {
 
     static let identifier: String = "TitleTableViewCell"
+    
+    // MARK: - Properties
+    
+    weak var delegate: TitleTableViewCellDelegate?
+    private var titleModel: Title?
     
     // MARK: - UI Components
     
@@ -48,6 +55,16 @@ class TitleTableViewCell: UITableViewCell {
         return imageView
     }()
     
+    private let watchlistButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "plus"), for: .normal)
+        button.tintColor = .white
+        button.backgroundColor = .systemGray.withAlphaComponent(0.7)
+        button.layer.cornerRadius = 15
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+    
     private let containerView: UIView = {
         let view = UIView()
         view.backgroundColor = .clear
@@ -80,6 +97,10 @@ class TitleTableViewCell: UITableViewCell {
         releaseDateLabel.text = nil
         descriptionLabel.text = nil
         descriptionLabel.isHidden = true
+        titleModel = nil
+        
+        // Reset watchlist button appearance
+        updateWatchlistButtonAppearance(isInWatchlist: false)
     }
     
     override func layoutSubviews() {
@@ -104,7 +125,11 @@ class TitleTableViewCell: UITableViewCell {
         containerView.addSubview(titleLabel)
         containerView.addSubview(releaseDateLabel)
         containerView.addSubview(descriptionLabel)
+        containerView.addSubview(watchlistButton)
         posterImageView.addSubview(loadingIndicator)
+        
+        // Setup watchlist button action
+        watchlistButton.addTarget(self, action: #selector(watchlistButtonTapped), for: .touchUpInside)
         
         // Configure cell appearance
         selectionStyle = .default
@@ -129,6 +154,12 @@ class TitleTableViewCell: UITableViewCell {
             posterImageView.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
             posterImageView.widthAnchor.constraint(equalToConstant: 100),
             posterImageView.heightAnchor.constraint(equalToConstant: 150),
+            
+            // Watchlist button
+            watchlistButton.topAnchor.constraint(equalTo: posterImageView.topAnchor, constant: 8),
+            watchlistButton.leadingAnchor.constraint(equalTo: posterImageView.leadingAnchor, constant: 8),
+            watchlistButton.widthAnchor.constraint(equalToConstant: 30),
+            watchlistButton.heightAnchor.constraint(equalToConstant: 30),
             
             // Loading indicator
             loadingIndicator.centerXAnchor.constraint(equalTo: posterImageView.centerXAnchor),
@@ -205,22 +236,11 @@ class TitleTableViewCell: UITableViewCell {
         }
     }
     
-    // New method that accepts both TitleViewModel and overview text
-    public func configure(with model: TitleViewModel, overview: String?) {
-        // First use the standard configure method
-        configure(with: model)
-        
-        // Then set the overview
-        if let overview = overview, !overview.isEmpty {
-            descriptionLabel.text = overview
-            descriptionLabel.isHidden = false
-        } else {
-            descriptionLabel.isHidden = true
-        }
-    }
-    
-    // New method that works directly with Title objects
+    // Configure with a Title model
     public func configure(with title: Title) {
+        // Store the title model for use with the watchlist button
+        self.titleModel = title
+        
         // Create view model from title
         let viewModel = TitleViewModel(
             titleName: title.displayTitle,
@@ -240,6 +260,54 @@ class TitleTableViewCell: UITableViewCell {
         } else {
             descriptionLabel.isHidden = true
         }
+        
+        // Update watchlist button state
+        let isInWatchlist = WatchlistManager.shared.isTitleInWatchlist(id: title.id)
+        updateWatchlistButtonAppearance(isInWatchlist: isInWatchlist)
+    }
+    
+    // New method that accepts both TitleViewModel and overview text
+    public func configure(with model: TitleViewModel, overview: String?) {
+        // First use the standard configure method
+        configure(with: model)
+        
+        // Then set the overview
+        if let overview = overview, !overview.isEmpty {
+            descriptionLabel.text = overview
+            descriptionLabel.isHidden = false
+        } else {
+            descriptionLabel.isHidden = true
+        }
+    }
+    
+    // MARK: - Watchlist Button
+    
+    private func updateWatchlistButtonAppearance(isInWatchlist: Bool) {
+        if isInWatchlist {
+            watchlistButton.setImage(UIImage(systemName: "checkmark"), for: .normal)
+            watchlistButton.backgroundColor = DesignSystem.Colors.primary.withAlphaComponent(0.8)
+        } else {
+            watchlistButton.setImage(UIImage(systemName: "plus"), for: .normal)
+            watchlistButton.backgroundColor = .systemGray.withAlphaComponent(0.7)
+        }
+    }
+    
+    @objc private func watchlistButtonTapped() {
+        guard let title = titleModel else { return }
+        
+        // Notify delegate
+        delegate?.addToWatchlistButtonTapped(for: title)
+        
+        // Provide haptic feedback
+        if #available(iOS 10.0, *) {
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.prepare()
+            generator.impactOccurred()
+        }
+        
+        // Toggle appearance
+        let isCurrentlyInWatchlist = WatchlistManager.shared.isTitleInWatchlist(id: title.id)
+        updateWatchlistButtonAppearance(isInWatchlist: !isCurrentlyInWatchlist)
     }
     
     // MARK: - Selection Animation

@@ -2,7 +2,7 @@
 //  WatchlistManager.swift
 //  Netflix_Clone
 //
-//  Created by mohamed reda oumahdi on 28/03/2025.
+//  Updated with debugging and fixes
 //
 
 import UIKit
@@ -15,7 +15,9 @@ class WatchlistManager {
     
     static let shared = WatchlistManager()
     
-    private init() {}
+    private init() {
+        print("WatchlistManager initialized")
+    }
     
     // MARK: - Properties
     
@@ -46,13 +48,17 @@ class WatchlistManager {
     
     /// Add a title to the user's watchlist
     func addToWatchlist(title: Title, completion: @escaping (Result<Void, Error>) -> Void) {
+        print("Adding to watchlist: \(title.id) - \(title.displayTitle)")
+        
         // Check if title already exists in watchlist
         if isTitleInWatchlist(id: title.id) {
+            print("Title already in watchlist: \(title.id)")
             completion(.failure(WatchlistError.titleAlreadyInWatchlist))
             return
         }
         
         guard let appDelegate = UIApplication.shared.delegate as? AppDelegate else {
+            print("Failed to get AppDelegate")
             completion(.failure(WatchlistError.unknown))
             return
         }
@@ -73,9 +79,12 @@ class WatchlistManager {
         watchlistItem.voteAverage = title.voteAverage ?? 0.0
         watchlistItem.addedDate = Date()
         
+        print("Created watchlist item with id: \(watchlistItem.id)")
+        
         // Save to Core Data
         do {
             try context.save()
+            print("Successfully saved to Core Data")
             NotificationCenter.default.post(name: .watchlistUpdated, object: nil)
             completion(.success(()))
         } catch {
@@ -86,6 +95,8 @@ class WatchlistManager {
     
     /// Remove a title from the user's watchlist
     func removeFromWatchlist(id: Int, completion: @escaping (Result<Void, Error>) -> Void) {
+        print("Removing from watchlist: \(id)")
+        
         guard let appDelegate = UIApplication.shared.delegate as? AppDelegate else {
             completion(.failure(WatchlistError.unknown))
             return
@@ -99,14 +110,17 @@ class WatchlistManager {
         
         do {
             let items = try context.fetch(fetchRequest)
+            print("Found \(items.count) items to remove")
             
             if let item = items.first {
                 context.delete(item)
                 try context.save()
+                print("Successfully deleted item from Core Data")
                 NotificationCenter.default.post(name: .watchlistUpdated, object: nil)
                 completion(.success(()))
             } else {
                 // Item not found - still consider this a success
+                print("Item not found in database, considering successful removal")
                 completion(.success(()))
             }
         } catch {
@@ -129,6 +143,7 @@ class WatchlistManager {
         
         do {
             let count = try context.count(for: fetchRequest)
+            print("isTitleInWatchlist check for id \(id): \(count > 0)")
             return count > 0
         } catch {
             print("Error checking watchlist: \(error)")
@@ -138,7 +153,10 @@ class WatchlistManager {
     
     /// Fetch all titles in the watchlist
     func fetchWatchlist(completion: @escaping (Result<[WatchlistItem], Error>) -> Void) {
+        print("Fetching watchlist items")
+        
         guard let appDelegate = UIApplication.shared.delegate as? AppDelegate else {
+            print("Failed to get AppDelegate")
             completion(.failure(WatchlistError.unknown))
             return
         }
@@ -154,6 +172,13 @@ class WatchlistManager {
         
         do {
             let items = try context.fetch(fetchRequest)
+            print("Successfully fetched \(items.count) watchlist items")
+            
+            // Debug print item information
+            for (index, item) in items.enumerated() {
+                print("Item \(index): ID=\(item.id), Title=\(item.title ?? "nil")")
+            }
+            
             completion(.success(items))
         } catch {
             print("Error fetching watchlist: \(error)")
@@ -175,6 +200,48 @@ class WatchlistManager {
             voteAverage: watchlistItem.voteAverage,
             backdropPath: watchlistItem.backdropPath
         )
+    }
+    
+    // Debug method to print the Core Data storage location
+    func printCoreDataStoreLocation() {
+        guard let appDelegate = UIApplication.shared.delegate as? AppDelegate else {
+            print("Could not access AppDelegate")
+            return
+        }
+        
+        let container = appDelegate.persistentContainer
+        guard let storeURL = container.persistentStoreCoordinator.persistentStores.first?.url else {
+            print("No persistent store URL found")
+            return
+        }
+        
+        print("Core Data store location: \(storeURL)")
+    }
+    
+    // Debug method to clear all watchlist items
+    func clearAllWatchlistItems(completion: @escaping (Result<Int, Error>) -> Void) {
+        guard let appDelegate = UIApplication.shared.delegate as? AppDelegate else {
+            completion(.failure(WatchlistError.unknown))
+            return
+        }
+        
+        let context = appDelegate.persistentContainer.viewContext
+        
+        // Create a fetch request to get all items
+        let fetchRequest = NSFetchRequest<NSFetchRequestResult>(entityName: "WatchlistItem")
+        let batchDeleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest)
+        
+        do {
+            let result = try context.execute(batchDeleteRequest) as? NSBatchDeleteResult
+            let count = result?.result as? Int ?? 0
+            try context.save()
+            print("Cleared \(count) watchlist items")
+            NotificationCenter.default.post(name: .watchlistUpdated, object: nil)
+            completion(.success(count))
+        } catch {
+            print("Failed to clear watchlist: \(error)")
+            completion(.failure(error))
+        }
     }
 }
 

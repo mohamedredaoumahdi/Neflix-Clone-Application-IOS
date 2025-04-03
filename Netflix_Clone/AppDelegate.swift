@@ -1,9 +1,5 @@
-//
-//  AppDelegate.swift
-//  Netflix_Clone
-//
-//  Created by mohamed reda oumahdi on 27/02/2024.
-//
+// AppDelegate.swift
+// Update to fix Core Data container name mismatch
 
 import UIKit
 import CoreData
@@ -13,6 +9,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
+        print("Application did finish launching")
+        
+        // Log Core Data store path
+        if let storeURL = persistentContainer.persistentStoreCoordinator.persistentStores.first?.url {
+            print("Core Data store location: \(storeURL)")
+        }
+        
         return true
     }
 
@@ -39,8 +42,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
          application to it. This property is optional since there are legitimate
          error conditions that could cause the creation of the store to fail.
         */
-        // IMPORTANT: Make sure this name EXACTLY matches your .xcdatamodeld file name
+        // THIS IS THE KEY FIX - Make sure this name matches your .xcdatamodeld file name
         let container = NSPersistentContainer(name: "NetflixCloneModel")
+        
+        // Log container creation
+        print("Creating Core Data persistent container with name: NetflixCloneModel")
+        
         container.loadPersistentStores(completionHandler: { (storeDescription, error) in
             if let error = error as NSError? {
                 // Log the error but don't crash in production
@@ -50,8 +57,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 // Only crash in debug mode to catch issues early
                 fatalError("Unresolved Core Data error: \(error), \(error.userInfo)")
                 #endif
+            } else {
+                print("Successfully loaded persistent store: \(storeDescription)")
             }
         })
+        
+        // Configure automatic merging of changes
+        container.viewContext.automaticallyMergesChangesFromParent = true
+        container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+        
         return container
     }()
 
@@ -62,6 +76,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         if context.hasChanges {
             do {
                 try context.save()
+                print("Core Data context saved successfully")
             } catch {
                 let error = error as NSError
                 print("Core Data context save error: \(error), \(error.userInfo)")

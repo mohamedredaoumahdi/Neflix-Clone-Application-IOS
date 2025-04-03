@@ -29,8 +29,9 @@ class HeroHeaderUIView: UIView {
         button.titleLabel?.font = .systemFont(ofSize: 17, weight: .bold)
         
         // Enhanced shadow for better visibility
+        
         button.layer.shadowColor = UIColor.black.cgColor
-        button.layer.shadowOpacity = 0.5
+        button.layer.shadowOpacity = 0.8
         button.layer.shadowOffset = CGSize(width: 0, height: 3)
         button.layer.shadowRadius = 6
         

@@ -1,6 +1,5 @@
 // ContentDetailBottomSheet.swift
-// Netflix_Clone
-//
+// Updated with improved watchlist button functionality
 
 import UIKit
 
@@ -111,6 +110,27 @@ class ContentDetailBottomSheet: UIViewController {
         return button
     }()
     
+    // New UI elements for better watchlist functionality
+    private let watchlistStatusView: UIView = {
+        let view = UIView()
+        view.backgroundColor = DesignSystem.Colors.primary.withAlphaComponent(0.2)
+        view.layer.cornerRadius = 8
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.alpha = 0 // Hidden by default
+        view.isHidden = true
+        return view
+    }()
+    
+    private let watchlistStatusLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 14, weight: .medium)
+        label.textColor = DesignSystem.Colors.primary
+        label.text = "Added to My List"
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
     // MARK: - Initialization
     
     init(with viewModel: TitlePreviewViewModel) {
@@ -179,6 +199,10 @@ class ContentDetailBottomSheet: UIViewController {
         containerView.addSubview(overviewLabel)
         containerView.addSubview(playButton)
         containerView.addSubview(addToListButton)
+        
+        // Add watchlist status view (shown when adding to watchlist)
+        containerView.addSubview(watchlistStatusView)
+        watchlistStatusView.addSubview(watchlistStatusLabel)
         
         // Add close button
         contentView.addSubview(closeButton)
@@ -271,8 +295,20 @@ class ContentDetailBottomSheet: UIViewController {
             addToListButton.heightAnchor.constraint(equalToConstant: 44),
             addToListButton.widthAnchor.constraint(equalTo: playButton.widthAnchor),
             
+            // Watchlist status view
+            watchlistStatusView.topAnchor.constraint(equalTo: addToListButton.bottomAnchor, constant: 16),
+            watchlistStatusView.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            watchlistStatusView.widthAnchor.constraint(equalTo: containerView.widthAnchor, multiplier: 0.8),
+            watchlistStatusView.heightAnchor.constraint(equalToConstant: 40),
+            
+            // Watchlist status label
+            watchlistStatusLabel.topAnchor.constraint(equalTo: watchlistStatusView.topAnchor),
+            watchlistStatusLabel.bottomAnchor.constraint(equalTo: watchlistStatusView.bottomAnchor),
+            watchlistStatusLabel.leadingAnchor.constraint(equalTo: watchlistStatusView.leadingAnchor, constant: 8),
+            watchlistStatusLabel.trailingAnchor.constraint(equalTo: watchlistStatusView.trailingAnchor, constant: -8),
+            
             // Make sure the container view extends below the buttons
-            playButton.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -40)
+            watchlistStatusView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -40)
         ])
         
         // Set content view offscreen initially
@@ -476,10 +512,8 @@ class ContentDetailBottomSheet: UIViewController {
                     switch result {
                     case .success:
                         self?.updateAddToListButtonForWatchlist(false)
-                        NotificationBanner.showInfo(
-                            title: "Removed from My List",
-                            subtitle: "This title has been removed from your list"
-                        )
+                        self?.showWatchlistStatusMessage("Removed from My List", isAdded: false)
+                        NotificationCenter.default.post(name: .watchlistUpdated, object: nil)
                     case .failure(let error):
                         NotificationBanner.showError(
                             title: "Error",
@@ -492,16 +526,21 @@ class ContentDetailBottomSheet: UIViewController {
             // Create a Title object from the view model
             let title = createTitleFromViewModel()
             
+            // Add haptic feedback
+            if #available(iOS 10.0, *) {
+                let generator = UIImpactFeedbackGenerator(style: .medium)
+                generator.prepare()
+                generator.impactOccurred()
+            }
+            
             // Add to watchlist
             WatchlistManager.shared.addToWatchlist(title: title) { [weak self] result in
                 DispatchQueue.main.async {
                     switch result {
                     case .success:
                         self?.updateAddToListButtonForWatchlist(true)
-                        NotificationBanner.showSuccess(
-                            title: "Added to My List",
-                            subtitle: "This title has been added to your list"
-                        )
+                        self?.showWatchlistStatusMessage("Added to My List", isAdded: true)
+                        NotificationCenter.default.post(name: .watchlistUpdated, object: nil)
                     case .failure(let error):
                         NotificationBanner.showError(
                             title: "Error",
@@ -517,10 +556,42 @@ class ContentDetailBottomSheet: UIViewController {
         if isInWatchlist {
             addToListButton.setTitle("Remove", for: .normal)
             addToListButton.setImage(UIImage(systemName: "checkmark"), for: .normal)
+            addToListButton.backgroundColor = DesignSystem.Colors.primary.withAlphaComponent(0.8)
         } else {
             addToListButton.setTitle("My List", for: .normal)
             addToListButton.setImage(UIImage(systemName: "plus"), for: .normal)
+            addToListButton.backgroundColor = UIColor.gray.withAlphaComponent(0.3)
         }
+    }
+    
+    private func showWatchlistStatusMessage(_ message: String, isAdded: Bool) {
+        // Update message
+        watchlistStatusLabel.text = message
+        
+        // Update appearance
+        if isAdded {
+            watchlistStatusView.backgroundColor = DesignSystem.Colors.primary.withAlphaComponent(0.2)
+            watchlistStatusLabel.textColor = DesignSystem.Colors.primary
+        } else {
+            watchlistStatusView.backgroundColor = .systemGray.withAlphaComponent(0.2)
+            watchlistStatusLabel.textColor = .systemGray
+        }
+        
+        // Make sure view is visible
+        watchlistStatusView.isHidden = false
+        watchlistStatusView.alpha = 0
+        
+        // Animate in
+        UIView.animate(withDuration: 0.3, animations: {
+            self.watchlistStatusView.alpha = 1
+        }, completion: { _ in
+            // Animate out after delay
+            UIView.animate(withDuration: 0.3, delay: 2.0, options: [], animations: {
+                self.watchlistStatusView.alpha = 0
+            }, completion: { _ in
+                self.watchlistStatusView.isHidden = true
+            })
+        })
     }
     
     private func createTitleFromViewModel() -> Title {

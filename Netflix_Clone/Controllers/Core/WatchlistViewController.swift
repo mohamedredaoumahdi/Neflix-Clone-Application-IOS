@@ -1,8 +1,5 @@
 // WatchlistViewController.swift
-// Netflix_Clone
-//
-// Created by mohamed reda oumahdi on 28/03/2025.
-//
+// Updated to properly handle notifications from other screens
 
 import UIKit
 import CoreData
@@ -69,10 +66,16 @@ class WatchlistViewController: UIViewController {
         setupUI()
         setupTableView()
         setupNotifications()
+        
+        // Debug print
+        print("WatchlistViewController loaded")
     }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        
+        // Debug print
+        print("WatchlistViewController will appear - fetching watchlist")
         fetchWatchlist()
     }
     
@@ -129,12 +132,19 @@ class WatchlistViewController: UIViewController {
     }
     
     private func setupNotifications() {
+        // Make sure to remove any existing observers to avoid duplicates
+        NotificationCenter.default.removeObserver(self)
+        
+        // Add observer with explicit name
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(watchlistUpdated),
             name: .watchlistUpdated,
             object: nil
         )
+        
+        // Debug print
+        print("Added notification observer for watchlist updates")
     }
     
     // MARK: - Data Methods
@@ -145,6 +155,9 @@ class WatchlistViewController: UIViewController {
             LoadingView.shared.showLoading(in: view, withText: "Loading My List...")
         }
         
+        // Debug print
+        print("Fetching watchlist data...")
+        
         WatchlistManager.shared.fetchWatchlist { [weak self] result in
             DispatchQueue.main.async {
                 // Hide loading indicators
@@ -153,13 +166,18 @@ class WatchlistViewController: UIViewController {
                 
                 switch result {
                 case .success(let items):
+                    // Debug print
+                    
+                    
                     self?.watchlistItems = items
+                    print("Watchlist fetch successful, found \(items.count) items")
                     self?.tableView.reloadData()
                     
                     // Show empty state view if needed
                     self?.updateEmptyState()
                     
                 case .failure(let error):
+                    print("Error fetching watchlist: \(error.localizedDescription)")
                     ErrorPresenter.showError(error, on: self!)
                 }
             }
@@ -170,19 +188,23 @@ class WatchlistViewController: UIViewController {
         if watchlistItems.isEmpty {
             emptyStateView.isHidden = false
             tableView.isHidden = true
+            print("Watchlist is empty, showing empty state")
         } else {
             emptyStateView.isHidden = true
             tableView.isHidden = false
+            print("Watchlist has \(watchlistItems.count) items, showing table")
         }
     }
     
     // MARK: - Action Methods
     
     @objc private func refreshWatchlist() {
+        print("Manual refresh triggered")
         fetchWatchlist()
     }
     
     @objc private func watchlistUpdated() {
+        print("Received watchlist updated notification")
         fetchWatchlist()
     }
     
@@ -244,15 +266,17 @@ extension WatchlistViewController: UITableViewDelegate, UITableViewDataSource {
         // Configure the cell
         let viewModel = TitleViewModel(
             titleName: item.title ?? "Unknown",
-            posterURL: item.posterPath ?? ""
+            posterURL: item.posterPath ?? "",
+            releaseDate: item.releaseDate
         )
         
-        cell.configure(with: viewModel)
+        // Configure with overview
+        cell.configure(with: viewModel, overview: item.overview)
         return cell
     }
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        return 150
+        return 180 // Increased for description text
     }
     
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
