@@ -11,145 +11,187 @@ import WebKit
 class TitlePreviewViewController: UIViewController {
     
     // MARK: - Properties
+       
+       private var viewModel: TitlePreviewViewModel?
+       private var castMembers: [Cast] = []
+       private var recommendations: [Title] = []
+       
+       // Public method to get the view model
+       func getViewModel() -> TitlePreviewViewModel? {
+           return viewModel
+       }
+       
+       // MARK: - UI Components
+       
+       private let scrollView: UIScrollView = {
+           let scrollView = UIScrollView()
+           scrollView.translatesAutoresizingMaskIntoConstraints = false
+           scrollView.showsVerticalScrollIndicator = false
+           return scrollView
+       }()
+       
+       private let contentView: UIView = {
+           let view = UIView()
+           view.translatesAutoresizingMaskIntoConstraints = false
+           return view
+       }()
+       
+       private let webView: WKWebView = {
+           let webView = WKWebView()
+           webView.translatesAutoresizingMaskIntoConstraints = false
+           return webView
+       }()
+       
+       private let titleLabel: UILabel = {
+           let label = UILabel()
+           label.font = .systemFont(ofSize: 22, weight: .bold)
+           label.textColor = .label
+           label.numberOfLines = 0
+           label.translatesAutoresizingMaskIntoConstraints = false
+           return label
+       }()
+       
+       private let overviewLabel: UILabel = {
+           let label = UILabel()
+           label.font = .systemFont(ofSize: 15, weight: .regular)
+           label.textColor = .label
+           label.numberOfLines = 0
+           label.translatesAutoresizingMaskIntoConstraints = false
+           return label
+       }()
+       
+       private let infoLabel: UILabel = {
+           let label = UILabel()
+           label.font = .systemFont(ofSize: 14, weight: .medium)
+           label.textColor = .secondaryLabel
+           label.translatesAutoresizingMaskIntoConstraints = false
+           return label
+       }()
+       
+       private let genreStackView: UIStackView = {
+           let stackView = UIStackView()
+           stackView.axis = .horizontal
+           stackView.spacing = 8
+           stackView.alignment = .center
+           stackView.distribution = .fillProportionally
+           stackView.translatesAutoresizingMaskIntoConstraints = false
+           return stackView
+       }()
+       
+       private let castLabel: UILabel = {
+           let label = UILabel()
+           label.text = "Cast"
+           label.font = .systemFont(ofSize: 18, weight: .bold)
+           label.textColor = .label
+           label.translatesAutoresizingMaskIntoConstraints = false
+           return label
+       }()
+       
+       private let castCollectionView: UICollectionView = {
+           let layout = UICollectionViewFlowLayout()
+           layout.scrollDirection = .horizontal
+           layout.itemSize = CGSize(width: 100, height: 140)
+           layout.minimumInteritemSpacing = 10
+           
+           let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+           collectionView.backgroundColor = .systemBackground
+           collectionView.showsHorizontalScrollIndicator = false
+           collectionView.translatesAutoresizingMaskIntoConstraints = false
+           return collectionView
+       }()
+       
+       private let recommendationsLabel: UILabel = {
+           let label = UILabel()
+           label.text = "More Like This"
+           label.font = .systemFont(ofSize: 18, weight: .bold)
+           label.textColor = .label
+           label.translatesAutoresizingMaskIntoConstraints = false
+           return label
+       }()
+       
+       private let recommendationsCollectionView: UICollectionView = {
+           let layout = UICollectionViewFlowLayout()
+           layout.scrollDirection = .horizontal
+           layout.itemSize = CGSize(width: 120, height: 180)
+           layout.minimumInteritemSpacing = 10
+           
+           let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+           collectionView.backgroundColor = .systemBackground
+           collectionView.showsHorizontalScrollIndicator = false
+           collectionView.translatesAutoresizingMaskIntoConstraints = false
+           return collectionView
+       }()
+       
+       // MARK: - Lifecycle Methods
+       
+       override func viewDidLoad() {
+           super.viewDidLoad()
+           view.backgroundColor = .systemBackground
+           setupUI()
+           setupCollectionViews()
+           
+           // Debug logging for collection view
+           print("🔍 Cast Collection View Frame: \(castCollectionView.frame)")
+           print("🔍 Cast Collection View Bounds: \(castCollectionView.bounds)")
+       }
     
-    private var viewModel: TitlePreviewViewModel?
-    private var castMembers: [Cast] = []
-    private var recommendations: [Title] = []
-    
-    // Public method to get the view model
-    func getViewModel() -> TitlePreviewViewModel? {
-        return viewModel
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        
+        // Force layout update
+        view.layoutIfNeeded()
+        
+        print("🔍 Scroll View Content Size: \(scrollView.contentSize)")
+        print("🔍 Content View Frame: \(contentView.frame)")
+        print("🔍 Cast Collection View Frame: \(castCollectionView.frame)")
+        print("🔍 Cast Collection View Bounds: \(castCollectionView.bounds)")
     }
     
-    // MARK: - UI Components
     
-    private let scrollView: UIScrollView = {
-        let scrollView = UIScrollView()
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.showsVerticalScrollIndicator = false
-        return scrollView
-    }()
-    
-    private let contentView: UIView = {
-        let view = UIView()
-        view.translatesAutoresizingMaskIntoConstraints = false
-        return view
-    }()
-    
-    private let webView: WKWebView = {
-        let webView = WKWebView()
-        webView.translatesAutoresizingMaskIntoConstraints = false
-        return webView
-    }()
-    
-    private let titleLabel: UILabel = {
-        let label = UILabel()
-        label.font = .systemFont(ofSize: 22, weight: .bold)
-        label.textColor = .label
-        label.numberOfLines = 0
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
-    
-    private let overviewLabel: UILabel = {
-        let label = UILabel()
-        label.font = .systemFont(ofSize: 15, weight: .regular)
-        label.textColor = .label
-        label.numberOfLines = 0
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
-    
-    private let infoLabel: UILabel = {
-        let label = UILabel()
-        label.font = .systemFont(ofSize: 14, weight: .medium)
-        label.textColor = .secondaryLabel
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
-    
-    private let genreStackView: UIStackView = {
-        let stackView = UIStackView()
-        stackView.axis = .horizontal
-        stackView.spacing = 8
-        stackView.alignment = .center
-        stackView.distribution = .fillProportionally
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        return stackView
-    }()
-    
-    private let castLabel: UILabel = {
-        let label = UILabel()
-        label.text = "Cast"
-        label.font = .systemFont(ofSize: 18, weight: .bold)
-        label.textColor = .label
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
-    
-    private let castCollectionView: UICollectionView = {
-        let layout = UICollectionViewFlowLayout()
-        layout.scrollDirection = .horizontal
-        layout.itemSize = CGSize(width: 100, height: 140)
-        layout.minimumInteritemSpacing = 10
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
         
-        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
-        collectionView.backgroundColor = .systemBackground
-        collectionView.showsHorizontalScrollIndicator = false
-        collectionView.translatesAutoresizingMaskIntoConstraints = false
-        return collectionView
-    }()
-    
-    private let recommendationsLabel: UILabel = {
-        let label = UILabel()
-        label.text = "More Like This"
-        label.font = .systemFont(ofSize: 18, weight: .bold)
-        label.textColor = .label
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
-    
-    private let recommendationsCollectionView: UICollectionView = {
-        let layout = UICollectionViewFlowLayout()
-        layout.scrollDirection = .horizontal
-        layout.itemSize = CGSize(width: 120, height: 180)
-        layout.minimumInteritemSpacing = 10
-        
-        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
-        collectionView.backgroundColor = .systemBackground
-        collectionView.showsHorizontalScrollIndicator = false
-        collectionView.translatesAutoresizingMaskIntoConstraints = false
-        return collectionView
-    }()
-    
-    // MARK: - Lifecycle Methods
-    
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        view.backgroundColor = .systemBackground
-        setupUI()
-        setupCollectionViews()
+        print("🔍 Scroll View Content Size: \(scrollView.contentSize)")
+        print("🔍 Content View Frame: \(contentView.frame)")
+        print("🔍 Cast Collection View Frame: \(castCollectionView.frame)")
+        print("🔍 Cast Collection View Bounds: \(castCollectionView.bounds)")
+        print("🔍 Cast Collection View Content Inset: \(castCollectionView.contentInset)")
     }
-    
-    // MARK: - Setup Methods
-    
-    private func setupCollectionViews() {
-        // Register cell classes
-        castCollectionView.register(CastCollectionViewCell.self, forCellWithReuseIdentifier: CastCollectionViewCell.identifier)
-        recommendationsCollectionView.register(TitleCollectionViewCell.self, forCellWithReuseIdentifier: TitleCollectionViewCell.identifier)
-        
-        // Set delegate and data source
-        castCollectionView.delegate = self
-        castCollectionView.dataSource = self
-        recommendationsCollectionView.delegate = self
-        recommendationsCollectionView.dataSource = self
-        
-        // Initially hide sections until we have data
-        castLabel.isHidden = true
-        castCollectionView.isHidden = true
-        recommendationsLabel.isHidden = true
-        recommendationsCollectionView.isHidden = true
-    }
+       
+       // MARK: - Setup Methods
+       
+       private func setupCollectionViews() {
+           // Register cell classes
+           castCollectionView.register(CastCollectionViewCell.self, forCellWithReuseIdentifier: CastCollectionViewCell.identifier)
+           recommendationsCollectionView.register(TitleCollectionViewCell.self, forCellWithReuseIdentifier: TitleCollectionViewCell.identifier)
+           
+           // Set delegate and data source
+           castCollectionView.delegate = self
+           castCollectionView.dataSource = self
+           recommendationsCollectionView.delegate = self
+           recommendationsCollectionView.dataSource = self
+           
+           // Initially hide sections until we have data
+           castLabel.isHidden = true
+           castCollectionView.isHidden = true
+           recommendationsLabel.isHidden = true
+           recommendationsCollectionView.isHidden = true
+           
+           castCollectionView.contentInset = UIEdgeInsets(top: 0, left: 20, bottom: 0, right: 20)
+           
+           // Remove any content inset
+               castCollectionView.contentInset = .zero
+               
+               // Set collection view layout
+               let layout = UICollectionViewFlowLayout()
+               layout.scrollDirection = .horizontal
+               layout.itemSize = CGSize(width: 100, height: 140)
+               layout.minimumInteritemSpacing = 10
+               layout.minimumLineSpacing = 10
+               layout.sectionInset = UIEdgeInsets(top: 0, left: 20, bottom: 0, right: 20)
+               
+               castCollectionView.collectionViewLayout = layout
+       }
     
     private func setupUI() {
         // Add scrollView and contentView
@@ -183,7 +225,9 @@ class TitlePreviewViewController: UIViewController {
             contentView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
             contentView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
             contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
-            contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor)
+            contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+            
+            contentView.heightAnchor.constraint(greaterThanOrEqualTo: scrollView.heightAnchor)
         ])
         
         // WebView constraints
@@ -223,15 +267,16 @@ class TitlePreviewViewController: UIViewController {
         ])
         
         // Cast section constraints
-        NSLayoutConstraint.activate([
-            castLabel.topAnchor.constraint(equalTo: overviewLabel.bottomAnchor, constant: 24),
-            castLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            
-            castCollectionView.topAnchor.constraint(equalTo: castLabel.bottomAnchor, constant: 12),
-            castCollectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            castCollectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            castCollectionView.heightAnchor.constraint(equalToConstant: 140)
-        ])
+            NSLayoutConstraint.activate([
+                castLabel.topAnchor.constraint(equalTo: overviewLabel.bottomAnchor, constant: 24),
+                castLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+                castLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+                
+                castCollectionView.topAnchor.constraint(equalTo: castLabel.bottomAnchor, constant: 12),
+                castCollectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+                castCollectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+                castCollectionView.heightAnchor.constraint(equalToConstant: 140)
+            ])
         
         // Recommendations section constraints
         NSLayoutConstraint.activate([
@@ -246,157 +291,187 @@ class TitlePreviewViewController: UIViewController {
         ])
     }
     
-    // MARK: - Public Methods
-    
-    public func configure(with model: TitlePreviewViewModel) {
-        self.viewModel = model
+    // MARK: - Cast Configuration Method
         
-        // Set title of the view controller
-        self.navigationItem.title = "Details"
-        
-        // Set title and overview
-        titleLabel.text = model.title
-        overviewLabel.text = model.titleOverview
-        
-        // Add additional info if available
-        var infoText = ""
-        
-        if let releaseDate = model.releaseDate {
-            // Format the date if needed
-            infoText += "Released: \(releaseDate)"
+        private func configureCastSection(with model: TitlePreviewViewModel) {
+            // Reset cast-related views
+            castMembers.removeAll()
+            castLabel.isHidden = true
+            castCollectionView.isHidden = true
+            
+            // Debug: Log cast source
+            print("🎬 Configuring Cast Section")
+            print("Movie Detail: \(model.movieDetail != nil)")
+            print("TV Show Detail: \(model.tvShowDetail != nil)")
+            
+            // Determine cast source
+            let castSource = model.movieDetail?.credits?.cast ?? model.tvShowDetail?.credits?.cast
+            let titleType = model.movieDetail != nil ? "Movie" : "TV Show"
+            
+            // Process cast
+            if let cast = castSource {
+                print("🎭 \(titleType) Cast:")
+                print("Total cast members found: \(cast.count)")
+                
+                // Filter and sort cast
+                let filteredCast = cast
+                    .prefix(10)
+                    .sorted(by: { $0.order < $1.order })
+                
+                print("Cast after sorting and filtering:")
+                filteredCast.forEach { member in
+                    print("- \(member.name) as \(member.character ?? "Unknown Role") [Order: \(member.order)]")
+                }
+                
+                // Update cast members
+                self.castMembers = Array(filteredCast)
+                
+                // Show cast section if we have members
+                if !self.castMembers.isEmpty {
+                    castLabel.isHidden = false
+                    castCollectionView.isHidden = false
+                    castCollectionView.reloadData()
+                }
+            } else {
+                print("⚠️ No cast information available for \(titleType)")
+            }
+            
+            // Final debug log
+            print("🎨 Cast Configuration Complete")
+            print("Cast Members Count: \(castMembers.count)")
+            print("Cast Label Hidden: \(castLabel.isHidden)")
+            print("Cast Collection Hidden: \(castCollectionView.isHidden)")
         }
         
-        if let voteAverage = model.voteAverage {
-            // Add a separator if we already have release date
-            if !infoText.isEmpty {
-                infoText += " • "
-            }
-            
-            infoText += "Rating: \(String(format: "%.1f", voteAverage))/10"
-        }
+        // MARK: - Main Configuration Method
         
-        if let runtime = model.runtime {
-            // Add a separator if we already have other info
-            if !infoText.isEmpty {
-                infoText += " • "
+        public func configure(with model: TitlePreviewViewModel) {
+            self.viewModel = model
+            
+            // Set title of the view controller
+            self.navigationItem.title = "Details"
+            
+            // Set title and overview
+            titleLabel.text = model.title
+            overviewLabel.text = model.titleOverview
+            
+            // Add additional info if available
+            var infoText = ""
+            
+            if let releaseDate = model.releaseDate {
+                infoText += "Released: \(releaseDate)"
             }
             
-            infoText += "\(runtime)"
-        }
-        
-        infoLabel.text = infoText
-        
-        // Setup genre tags if available
-        if let genres = model.genres, !genres.isEmpty {
-            // Clear any existing genre pills
-            genreStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
-            
-            // Create a genre pill for each genre (up to 3)
-            for genre in genres.prefix(3) {
-                let genrePill = createGenrePill(genre)
-                genreStackView.addArrangedSubview(genrePill)
+            if let voteAverage = model.voteAverage {
+                if !infoText.isEmpty {
+                    infoText += " • "
+                }
+                
+                infoText += "Rating: \(String(format: "%.1f", voteAverage))/10"
             }
             
-            if genres.count > 3 {
-                let morePill = createGenrePill("+\(genres.count - 3) more")
-                genreStackView.addArrangedSubview(morePill)
+            if let runtime = model.runtime {
+                if !infoText.isEmpty {
+                    infoText += " • "
+                }
+                
+                infoText += "\(runtime)"
             }
             
-            // Show the genre stack
-            genreStackView.isHidden = false
-        } else {
-            // Hide the genre stack if no genres
-            genreStackView.isHidden = true
-        }
-        
-        // Set cast if available
-        if let movieDetail = model.movieDetail {
-            if let cast = movieDetail.credits?.cast, !cast.isEmpty {
-                self.castMembers = cast.prefix(10).sorted(by: { $0.order < $1.order })
-                castLabel.isHidden = false
-                castCollectionView.isHidden = false
-                castCollectionView.reloadData()
+            infoLabel.text = infoText
+            
+            // Setup genre tags if available
+            if let genres = model.genres, !genres.isEmpty {
+                // Clear any existing genre pills
+                genreStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+                
+                // Create a genre pill for each genre (up to 3)
+                for genre in genres.prefix(3) {
+                    let genrePill = createGenrePill(genre)
+                    genreStackView.addArrangedSubview(genrePill)
+                }
+                
+                if genres.count > 3 {
+                    let morePill = createGenrePill("+\(genres.count - 3) more")
+                    genreStackView.addArrangedSubview(morePill)
+                }
+                
+                // Show the genre stack
+                genreStackView.isHidden = false
+            } else {
+                // Hide the genre stack if no genres
+                genreStackView.isHidden = true
             }
+            
+            // Configure cast section
+            configureCastSection(with: model)
             
             // Set recommendations if available
-            if let similar = movieDetail.similar?.results, !similar.isEmpty {
-                self.recommendations = similar.prefix(10).map { $0 }
+            let similarTitles = model.movieDetail?.similar?.results ?? model.tvShowDetail?.similar?.results ?? []
+            if !similarTitles.isEmpty {
+                self.recommendations = similarTitles.prefix(10).map { $0 }
                 recommendationsLabel.isHidden = false
                 recommendationsCollectionView.isHidden = false
                 recommendationsCollectionView.reloadData()
-            }
-        } else if let tvDetail = model.tvShowDetail {
-            if let cast = tvDetail.credits?.cast, !cast.isEmpty {
-                self.castMembers = cast.prefix(10).sorted(by: { $0.order < $1.order })
-                castLabel.isHidden = false
-                castCollectionView.isHidden = false
-                castCollectionView.reloadData()
+            } else {
+                recommendationsLabel.isHidden = true
+                recommendationsCollectionView.isHidden = true
             }
             
-            // Set recommendations if available
-            if let similar = tvDetail.similar?.results, !similar.isEmpty {
-                self.recommendations = similar.prefix(10).map { $0 }
-                recommendationsLabel.isHidden = false
-                recommendationsCollectionView.isHidden = false
-                recommendationsCollectionView.reloadData()
+            // Load YouTube video if available
+            if let videoElement = model.youtubeView {
+                let videoId = videoElement.id.videoId
+                
+                let urlString = "\(Configuration.URLs.YOUTUBE_EMBED_URL)\(videoId)"
+                guard let url = URL(string: urlString) else {
+                    return
+                }
+                
+                // Add loading indicator to webView
+                let spinner = UIActivityIndicatorView(style: .large)
+                spinner.color = .white
+                spinner.translatesAutoresizingMaskIntoConstraints = false
+                webView.addSubview(spinner)
+                
+                NSLayoutConstraint.activate([
+                    spinner.centerXAnchor.constraint(equalTo: webView.centerXAnchor),
+                    spinner.centerYAnchor.constraint(equalTo: webView.centerYAnchor)
+                ])
+                
+                spinner.startAnimating()
+                
+                // Now load the URL
+                webView.load(URLRequest(url: url))
+                
+                // Set webView navigation delegate to hide spinner when loaded
+                webView.navigationDelegate = self
             }
         }
         
-        // Load YouTube video if available
-        if let videoElement = model.youtubeView {
-            let videoId = videoElement.id.videoId
+        // MARK: - Helper Methods
+        
+        private func createGenrePill(_ text: String) -> UIView {
+            let container = UIView()
+            container.backgroundColor = .systemBlue.withAlphaComponent(0.2)
+            container.layer.cornerRadius = 12
             
-            // Create URL outside the guard statement so it's available in the wider scope
-            let urlString = "\(Configuration.URLs.YOUTUBE_EMBED_URL)\(videoId)"
-            guard let url = URL(string: urlString) else {
-                return
-            }
+            let label = UILabel()
+            label.text = text
+            label.textColor = .systemBlue
+            label.font = .systemFont(ofSize: 12, weight: .medium)
+            label.translatesAutoresizingMaskIntoConstraints = false
             
-            // Add loading indicator to webView
-            let spinner = UIActivityIndicatorView(style: .large)
-            spinner.color = .white
-            spinner.translatesAutoresizingMaskIntoConstraints = false
-            webView.addSubview(spinner)
+            container.addSubview(label)
             
             NSLayoutConstraint.activate([
-                spinner.centerXAnchor.constraint(equalTo: webView.centerXAnchor),
-                spinner.centerYAnchor.constraint(equalTo: webView.centerYAnchor)
+                label.topAnchor.constraint(equalTo: container.topAnchor, constant: 4),
+                label.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -4),
+                label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 12),
+                label.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -12)
             ])
             
-            spinner.startAnimating()
-            
-            // Now load the URL
-            webView.load(URLRequest(url: url))
-            
-            // Set webView navigation delegate to hide spinner when loaded
-            webView.navigationDelegate = self
+            return container
         }
-    }
-    
-    // MARK: - Helper Methods
-    
-    private func createGenrePill(_ text: String) -> UIView {
-        let container = UIView()
-        container.backgroundColor = .systemBlue.withAlphaComponent(0.2)
-        container.layer.cornerRadius = 12
-        
-        let label = UILabel()
-        label.text = text
-        label.textColor = .systemBlue
-        label.font = .systemFont(ofSize: 12, weight: .medium)
-        label.translatesAutoresizingMaskIntoConstraints = false
-        
-        container.addSubview(label)
-        
-        NSLayoutConstraint.activate([
-            label.topAnchor.constraint(equalTo: container.topAnchor, constant: 4),
-            label.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -4),
-            label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 12),
-            label.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -12)
-        ])
-        
-        return container
-    }
 }
 
 // MARK: - UICollectionViewDelegate, UICollectionViewDataSource
@@ -404,8 +479,10 @@ class TitlePreviewViewController: UIViewController {
 extension TitlePreviewViewController: UICollectionViewDelegate, UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         if collectionView == castCollectionView {
+            print("🔍 Cast Collection View - Number of Items: \(castMembers.count)")
             return castMembers.count
         } else if collectionView == recommendationsCollectionView {
+            print("🔍 Recommendations Collection View - Number of Items: \(recommendations.count)")
             return recommendations.count
         }
         return 0
@@ -414,10 +491,12 @@ extension TitlePreviewViewController: UICollectionViewDelegate, UICollectionView
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         if collectionView == castCollectionView {
             guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: CastCollectionViewCell.identifier, for: indexPath) as? CastCollectionViewCell else {
+                print("❌ Failed to dequeue CastCollectionViewCell")
                 return UICollectionViewCell()
             }
             
             let castMember = castMembers[indexPath.item]
+            print("🎭 Configuring Cast Cell: \(castMember.name)")
             cell.configure(with: castMember)
             return cell
             
@@ -507,5 +586,25 @@ extension TitlePreviewViewController: WKNavigationDelegate {
             errorLabel.centerXAnchor.constraint(equalTo: errorView.centerXAnchor),
             errorLabel.centerYAnchor.constraint(equalTo: errorView.centerYAnchor)
         ])
+    }
+}
+
+// Optional: UICollectionViewDelegateFlowLayout to customize cell sizing if needed
+extension TitlePreviewViewController: UICollectionViewDelegateFlowLayout {
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
+        if collectionView == castCollectionView {
+            return CGSize(width: 100, height: 140)
+        } else if collectionView == recommendationsCollectionView {
+            return CGSize(width: 120, height: 180)
+        }
+        return .zero
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumInteritemSpacingForSectionAt section: Int) -> CGFloat {
+        return 10
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumLineSpacingForSectionAt section: Int) -> CGFloat {
+        return 10
     }
 }
