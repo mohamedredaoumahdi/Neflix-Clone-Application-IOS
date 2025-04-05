@@ -80,7 +80,13 @@ class CastCollectionViewCell: UICollectionViewCell {
         contentView.addSubview(loadingIndicator)
         
         // Configure appearance
-        contentView.backgroundColor = .clear
+        contentView.backgroundColor = .systemBackground
+        
+        // Make profile image view circular
+        profileImageView.layer.cornerRadius = 40
+        profileImageView.clipsToBounds = true
+        profileImageView.layer.borderWidth = 1
+        profileImageView.layer.borderColor = UIColor.systemGray5.cgColor
         
         // Set constraints
         NSLayoutConstraint.activate([
@@ -102,7 +108,8 @@ class CastCollectionViewCell: UICollectionViewCell {
             // Character label
             characterLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 2),
             characterLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
-            characterLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4)
+            characterLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
+            characterLabel.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -4)
         ])
     }
     
@@ -116,21 +123,32 @@ class CastCollectionViewCell: UICollectionViewCell {
         // Show loading indicator
         loadingIndicator.startAnimating()
         
+        // Print debug info
+        print("🎭 Configuring cell for: \(cast.name)")
+        print("  Has profile path: \(cast.profilePath != nil)")
+        
         // Load profile image if available
         if let profilePath = cast.profilePath, !profilePath.isEmpty {
             let imageUrl = Configuration.URLs.TMDB_IMAGE_URL + "/\(profilePath)"
-            profileImageView.sd_setImage(with: URL(string: imageUrl), completed: { [weak self] _, error, _, _ in
+            print("  Loading image from: \(imageUrl)")
+            
+            profileImageView.sd_setImage(with: URL(string: imageUrl), placeholderImage: UIImage(systemName: "person.fill"), completed: { [weak self] image, error, _, _ in
                 self?.loadingIndicator.stopAnimating()
                 
-                if error != nil {
+                if let error = error {
+                    print("  ❌ Image loading error: \(error.localizedDescription)")
                     // Show placeholder on error
                     self?.profileImageView.image = UIImage(systemName: "person.fill")
                     self?.profileImageView.tintColor = .systemGray
                     self?.profileImageView.contentMode = .scaleAspectFit
+                } else if image != nil {
+                    print("  ✅ Image loaded successfully")
+                    self?.profileImageView.contentMode = .scaleAspectFill
                 }
             })
         } else {
             // No profile image available
+            print("  ℹ️ No profile image available, using placeholder")
             loadingIndicator.stopAnimating()
             profileImageView.image = UIImage(systemName: "person.fill")
             profileImageView.tintColor = .systemGray
